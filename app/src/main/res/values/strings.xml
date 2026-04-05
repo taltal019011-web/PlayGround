@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">PlayGround</string>
+    <string name="sign_up_title">Create Account</string>
+    <string name="sign_in_title">Welcome Back</string>
+    <string name="hint_username">Username</string>
+    <string name="hint_password">Password</string>
+    <string name="action_sign_up">Sign Up</string>
+    <string name="action_sign_in">Sign In</string>
+    <string name="action_sign_out">Sign Out</string>
+    <string name="link_sign_in">Already have an account? Sign In</string>
+    <string name="link_sign_up">Don\'t have an account? Sign Up</string>
+    <string name="welcome_message">Welcome, %1$s!</string>
 </resources>
