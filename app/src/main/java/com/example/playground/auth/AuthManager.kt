@@ -2,6 +2,7 @@ package com.example.playground.auth
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.database.sqlite.SQLiteConstraintException
 import com.example.playground.data.AppDatabase
 import com.example.playground.data.User
 import java.security.MessageDigest
@@ -29,7 +30,11 @@ class AuthManager(context: Context) {
         val salt = generateSalt()
         val hash = hashPassword(password, salt)
         val user = User(username = username, passwordHash = hash, salt = salt)
-        val id = userDao.insertUser(user)
+        val id = try {
+            userDao.insertUser(user)
+        } catch (_: SQLiteConstraintException) {
+            return AuthResult.Error("Username is already taken")
+        }
         val savedUser = user.copy(id = id)
 
         prefs.edit().putLong(KEY_USER_ID, id).apply()
