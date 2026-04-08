@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [User::class], version = 1)
+@Database(entities = [User::class, Event::class], version = 2)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
+    abstract fun eventDao(): EventDao
 
     companion object {
         @Volatile
@@ -19,7 +20,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "playground.db"
-                ).allowMainThreadQueries().build().also { instance = it }
+                )
+                    .allowMainThreadQueries() // Allows DB access on UI thread (Current fix for Error 1)
+                    .fallbackToDestructiveMigration() // Wipes DB if versions don't match (Fix for Error 2)
+                    .build()
+                    .also { instance = it }
             }
         }
     }
