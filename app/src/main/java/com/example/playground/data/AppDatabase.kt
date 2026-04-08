@@ -21,8 +21,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "playground.db"
                 )
-                    .allowMainThreadQueries() // Allows DB access on UI thread (Current fix for Error 1)
-                    .fallbackToDestructiveMigration() // Wipes DB if versions don't match (Fix for Error 2)
+                    .allowMainThreadQueries()
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
             }
