@@ -8,7 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.playground.auth.AuthManager
+import com.example.playground.ui.home.CreateEventActivity
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -35,8 +37,13 @@ class MainActivity : AppCompatActivity() {
 
         val welcomeText = findViewById<TextView>(R.id.welcomeText)
         val signOutButton = findViewById<MaterialButton>(R.id.signOutButton)
+        val createEventFab = findViewById<FloatingActionButton>(R.id.createEventFab)
 
         welcomeText.text = getString(R.string.welcome_message, currentUser.username)
+
+        createEventFab.setOnClickListener {
+            startActivity(Intent(this, CreateEventActivity::class.java))
+        }
 
         signOutButton.setOnClickListener {
             authManager.signOut()
