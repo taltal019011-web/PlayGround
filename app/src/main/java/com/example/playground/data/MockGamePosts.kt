@@ -2,7 +2,7 @@ package com.example.playground.data
 
 object MockGamePosts {
 
-    val items = listOf(
+    private val items = mutableListOf(
         GamePost(
             id = "1",
             sport = "Basketball",
@@ -16,9 +16,15 @@ object MockGamePosts {
             hostName = "David Cohen",
             postedAgo = "30m ago",
             description = "Good lighting, great court!",
-            commentAuthor = "Sarah Levi",
-            commentText = "On my way! Be there in 10 mins",
-            commentAgo = "15m ago"
+            averageRating = 4.5f,
+            ratingCount = 8,
+            comments = mutableListOf(
+                GameComment(
+                    author = "Sarah Levi",
+                    text = "On my way! Be there in 10 mins",
+                    postedAgo = "15m ago"
+                )
+            )
         ),
         GamePost(
             id = "2",
@@ -33,9 +39,15 @@ object MockGamePosts {
             hostName = "Omer Ben David",
             postedAgo = "45m ago",
             description = "Bring water and dark shirts.",
-            commentAuthor = "Noam Avni",
-            commentText = "I am bringing one more player with me",
-            commentAgo = "12m ago"
+            averageRating = 4.1f,
+            ratingCount = 5,
+            comments = mutableListOf(
+                GameComment(
+                    author = "Noam Avni",
+                    text = "I am bringing one more player with me",
+                    postedAgo = "12m ago"
+                )
+            )
         ),
         GamePost(
             id = "3",
@@ -50,9 +62,15 @@ object MockGamePosts {
             hostName = "Maya Levi",
             postedAgo = "20m ago",
             description = "Intermediate level, casual game.",
-            commentAuthor = "Ronit Shalev",
-            commentText = "Sounds good, I can come after work",
-            commentAgo = "8m ago"
+            averageRating = 4.7f,
+            ratingCount = 3,
+            comments = mutableListOf(
+                GameComment(
+                    author = "Ronit Shalev",
+                    text = "Sounds good, I can come after work",
+                    postedAgo = "8m ago"
+                )
+            )
         ),
         GamePost(
             id = "4",
@@ -67,9 +85,73 @@ object MockGamePosts {
             hostName = "Neta Bar",
             postedAgo = "1h ago",
             description = "Fun game near the beach, all levels welcome.",
-            commentAuthor = "Gal Mor",
-            commentText = "Saving this one, maybe joining later",
-            commentAgo = "25m ago"
+            averageRating = 4.3f,
+            ratingCount = 6,
+            comments = mutableListOf(
+                GameComment(
+                    author = "Gal Mor",
+                    text = "Saving this one, maybe joining later",
+                    postedAgo = "25m ago"
+                )
+            )
         )
     )
+
+    fun getPublishedUpcomingGames(): List<GamePost> {
+        return items.filter { it.isPublished && it.isUpcoming }
+    }
+
+    fun getActiveGames(): List<GamePost> {
+        return items.filter { it.isActive() }
+    }
+
+    fun findById(id: String): GamePost? {
+        return items.find { it.id == id }
+    }
+
+    fun joinGame(id: String): GamePost? {
+        val post = findById(id) ?: return null
+
+        if (!post.isActive()) return post
+        if (post.joinedByMe) return post
+
+        post.currentPlayers += 1
+        post.joinedByMe = true
+        return post
+    }
+
+    fun rateGame(id: String, stars: Int): GamePost? {
+        val post = findById(id) ?: return null
+        val safeStars = stars.coerceIn(1, 5)
+
+        val previousRating = post.myRating
+        if (previousRating == null) {
+            val total = (post.averageRating * post.ratingCount) + safeStars
+            post.ratingCount += 1
+            post.averageRating = total / post.ratingCount
+        } else {
+            val total = (post.averageRating * post.ratingCount) - previousRating + safeStars
+            post.averageRating = total / post.ratingCount
+        }
+
+        post.myRating = safeStars
+        return post
+    }
+
+    fun addComment(id: String, author: String, text: String): GamePost? {
+        val post = findById(id) ?: return null
+        val trimmedText = text.trim()
+        if (trimmedText.isEmpty()) return post
+
+        post.comments.add(
+            0,
+            GameComment(
+                author = author,
+                text = trimmedText,
+                postedAgo = "now"
+            )
+        )
+
+        return post
+    }
 }

@@ -6,11 +6,13 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.playground.auth.AuthManager
+import com.example.playground.data.GameComment
 import com.example.playground.data.GamePost
 import com.example.playground.data.MockGamePosts
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -27,6 +29,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var authManager: AuthManager
     private var googleMap: GoogleMap? = null
+    private var currentUsername: String = "Player"
 
     private lateinit var searchInput: TextInputEditText
 
@@ -39,6 +42,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var activeGamesCard: View
     private lateinit var activeGamesCountText: TextView
     private lateinit var closeActiveGamesButton: ImageButton
+    private lateinit var toggleActiveGamesButton: ImageButton
+    private lateinit var activeGamesContent: View
 
     private lateinit var detailsCard: View
     private lateinit var closeDetailsButton: ImageButton
@@ -50,12 +55,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var descriptionText: TextView
     private lateinit var locationText: TextView
     private lateinit var coordinatesText: TextView
+    private lateinit var commentsTitleText: TextView
     private lateinit var commentAuthorText: TextView
     private lateinit var commentBodyText: TextView
     private lateinit var commentAgoText: TextView
+    private lateinit var commentInput: TextInputEditText
+    private lateinit var sendCommentButton: MaterialButton
+    private lateinit var joinButton: MaterialButton
+    private lateinit var ratingValueText: TextView
 
-    private val gamePosts: List<GamePost> = MockGamePosts.items
+    private lateinit var star1: TextView
+    private lateinit var star2: TextView
+    private lateinit var star3: TextView
+    private lateinit var star4: TextView
+    private lateinit var star5: TextView
+
     private var selectedSport: String = "All"
+    private var activeGamesExpanded = true
+    private var selectedPostId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +94,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
 
+        currentUsername = currentUser.username
+
         val welcomeText = findViewById<TextView>(R.id.welcomeText)
         val signOutButton = findViewById<MaterialButton>(R.id.signOutButton)
 
@@ -91,6 +110,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         activeGamesCard = findViewById(R.id.activeGamesCard)
         activeGamesCountText = findViewById(R.id.activeGamesCountText)
         closeActiveGamesButton = findViewById(R.id.closeActiveGamesButton)
+        toggleActiveGamesButton = findViewById(R.id.toggleActiveGamesButton)
+        activeGamesContent = findViewById(R.id.activeGamesContent)
 
         detailsCard = findViewById(R.id.detailsCard)
         closeDetailsButton = findViewById(R.id.closeDetailsButton)
@@ -102,11 +123,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         descriptionText = findViewById(R.id.descriptionText)
         locationText = findViewById(R.id.locationText)
         coordinatesText = findViewById(R.id.coordinatesText)
+        commentsTitleText = findViewById(R.id.commentsTitleText)
         commentAuthorText = findViewById(R.id.commentAuthorText)
         commentBodyText = findViewById(R.id.commentBodyText)
         commentAgoText = findViewById(R.id.commentAgoText)
+        commentInput = findViewById(R.id.commentInput)
+        sendCommentButton = findViewById(R.id.sendCommentButton)
+        joinButton = findViewById(R.id.joinButton)
+        ratingValueText = findViewById(R.id.ratingValueText)
 
-        welcomeText.text = getString(R.string.welcome_message, currentUser.username)
+        star1 = findViewById(R.id.star1)
+        star2 = findViewById(R.id.star2)
+        star3 = findViewById(R.id.star3)
+        star4 = findViewById(R.id.star4)
+        star5 = findViewById(R.id.star5)
+
+        welcomeText.text = getString(R.string.welcome_message, currentUsername)
 
         signOutButton.setOnClickListener {
             authManager.signOut()
@@ -118,10 +150,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             activeGamesCard.visibility = View.GONE
         }
 
-        closeDetailsButton.setOnClickListener {
-            detailsCard.visibility = View.GONE
+        toggleActiveGamesButton.setOnClickListener {
+            activeGamesExpanded = !activeGamesExpanded
+            activeGamesContent.visibility = if (activeGamesExpanded) View.VISIBLE else View.GONE
+            toggleActiveGamesButton.rotation = if (activeGamesExpanded) 180f else 0f
         }
 
+        closeDetailsButton.setOnClickListener {
+            closeDetailsCard()
+        }
+
+        joinButton.setOnClickListener {
+            joinSelectedGame()
+        }
+
+        sendCommentButton.setOnClickListener {
+            sendComment()
+        }
+
+        setupRatingClicks()
         setupChips()
 
         searchInput.setOnEditorActionListener { _, actionId, _ ->
@@ -135,6 +182,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+    }
+
+    private fun setupRatingClicks() {
+        star1.setOnClickListener { rateSelectedGame(1) }
+        star2.setOnClickListener { rateSelectedGame(2) }
+        star3.setOnClickListener { rateSelectedGame(3) }
+        star4.setOnClickListener { rateSelectedGame(4) }
+        star5.setOnClickListener { rateSelectedGame(5) }
     }
 
     private fun setupChips() {
@@ -188,6 +243,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map.setOnMarkerClickListener { marker ->
             val post = marker.tag as? GamePost
             if (post != null) {
+                selectedPostId = post.id
                 showDetailsCard(post)
                 map.animateCamera(
                     CameraUpdateFactory.newLatLngZoom(
@@ -200,18 +256,33 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         map.setOnMapClickListener {
-            detailsCard.visibility = View.GONE
+            closeDetailsCard()
         }
 
-        showMarkers(gamePosts)
-        updateActiveGamesCard(gamePosts)
+        applyFilters()
+    }
+
+    private fun getFilteredPosts(): List<GamePost> {
+        val query = searchInput.text?.toString().orEmpty().trim().lowercase()
+
+        return MockGamePosts.getActiveGames().filter { item ->
+            val sportMatches =
+                selectedSport == "All" || item.sport.equals(selectedSport, ignoreCase = true)
+
+            val textMatches =
+                query.isEmpty() ||
+                        item.title.lowercase().contains(query) ||
+                        item.sport.lowercase().contains(query) ||
+                        item.location.lowercase().contains(query)
+
+            sportMatches && textMatches
+        }
     }
 
     private fun showMarkers(items: List<GamePost>) {
         val map = googleMap ?: return
 
         map.clear()
-        detailsCard.visibility = View.GONE
 
         for (item in items) {
             val marker = map.addMarker(
@@ -225,23 +296,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun applyFilters() {
         val map = googleMap ?: return
-        val query = searchInput.text?.toString().orEmpty().trim().lowercase()
-
-        val filtered = gamePosts.filter { item ->
-            val sportMatches =
-                selectedSport == "All" || item.sport.equals(selectedSport, ignoreCase = true)
-
-            val textMatches =
-                query.isEmpty() ||
-                        item.title.lowercase().contains(query) ||
-                        item.sport.lowercase().contains(query) ||
-                        item.location.lowercase().contains(query)
-
-            sportMatches && textMatches
-        }
+        val filtered = getFilteredPosts()
 
         showMarkers(filtered)
         updateActiveGamesCard(filtered)
+
+        val currentSelectedPost = selectedPostId?.let { id ->
+            MockGamePosts.findById(id)?.takeIf { it.isActive() }
+        }
+
+        if (currentSelectedPost == null) {
+            closeDetailsCard()
+        } else {
+            showDetailsCard(currentSelectedPost)
+        }
 
         if (filtered.isNotEmpty()) {
             val firstLocation = LatLng(filtered.first().latitude, filtered.first().longitude)
@@ -256,6 +324,49 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         activeGamesCountText.text = "${items.size} games near you"
     }
 
+    private fun joinSelectedGame() {
+        val postId = selectedPostId ?: return
+        val updatedPost = MockGamePosts.joinGame(postId) ?: return
+
+        if (updatedPost.joinedByMe) {
+            Toast.makeText(this, "You joined the game", Toast.LENGTH_SHORT).show()
+        }
+
+        applyFilters()
+        closeDetailsCard()
+
+        if (!updatedPost.isActive()) {
+            Toast.makeText(this, "This game is now full", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun rateSelectedGame(stars: Int) {
+        val postId = selectedPostId ?: return
+        val updatedPost = MockGamePosts.rateGame(postId, stars) ?: return
+        showDetailsCard(updatedPost)
+        Toast.makeText(this, "You rated this court $stars stars", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun sendComment() {
+        val postId = selectedPostId ?: return
+        val text = commentInput.text?.toString().orEmpty()
+
+        if (text.isBlank()) {
+            Toast.makeText(this, "Write a comment first", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val updatedPost = MockGamePosts.addComment(
+            id = postId,
+            author = currentUsername,
+            text = text
+        ) ?: return
+
+        commentInput.setText("")
+        showDetailsCard(updatedPost)
+        Toast.makeText(this, "Comment sent", Toast.LENGTH_SHORT).show()
+    }
+
     private fun showDetailsCard(post: GamePost) {
         detailsCard.visibility = View.VISIBLE
 
@@ -267,8 +378,52 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         descriptionText.text = post.description
         locationText.text = post.location
         coordinatesText.text = "${post.latitude}, ${post.longitude}"
-        commentAuthorText.text = post.commentAuthor
-        commentBodyText.text = post.commentText
-        commentAgoText.text = post.commentAgo
+
+        val latestComment = post.comments.firstOrNull()
+        bindLatestComment(latestComment, post.comments.size)
+
+        ratingValueText.text = String.format("%.1f", post.averageRating)
+        renderStars(post.myRating ?: post.averageRating.toInt().coerceIn(1, 5))
+
+        if (post.isActive()) {
+            joinButton.isEnabled = true
+            joinButton.text = if (post.joinedByMe) "Already Joined" else "I'm Coming!"
+            joinButton.alpha = if (post.joinedByMe) 0.7f else 1f
+            joinButton.isClickable = !post.joinedByMe
+        } else {
+            joinButton.isEnabled = false
+            joinButton.text = "Game Full"
+            joinButton.alpha = 0.7f
+        }
+    }
+
+    private fun bindLatestComment(comment: GameComment?, count: Int) {
+        commentsTitleText.text = "Comments ($count)"
+
+        if (comment == null) {
+            commentAuthorText.text = "No comments yet"
+            commentBodyText.text = "Be the first to comment"
+            commentAgoText.text = ""
+            return
+        }
+
+        commentAuthorText.text = comment.author
+        commentBodyText.text = comment.text
+        commentAgoText.text = comment.postedAgo
+    }
+
+    private fun renderStars(selectedStars: Int) {
+        val stars = listOf(star1, star2, star3, star4, star5)
+
+        stars.forEachIndexed { index, textView ->
+            val filled = index < selectedStars
+            textView.text = if (filled) "★" else "☆"
+            textView.alpha = if (filled) 1f else 0.45f
+        }
+    }
+
+    private fun closeDetailsCard() {
+        detailsCard.visibility = View.GONE
+        selectedPostId = null
     }
 }

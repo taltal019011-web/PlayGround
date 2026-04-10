@@ -7,6 +7,13 @@
     android:layout_height="match_parent"
     android:background="#F7F2FA">
 
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/detailsTopGuide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.15" />
+
     <TextView
         android:id="@+id/welcomeText"
         android:layout_width="0dp"
@@ -127,10 +134,10 @@
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/activeGamesCard"
-        android:layout_width="250dp"
+        android:layout_width="210dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="28dp"
-        android:layout_marginTop="28dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="16dp"
         app:cardCornerRadius="24dp"
         app:cardElevation="8dp"
         app:layout_constraintStart_toStartOf="@id/map"
@@ -140,7 +147,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="18dp">
+            android:padding="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -158,54 +165,70 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="📍 Active Games"
-                        android:textSize="22sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/activeGamesCountText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:text="3 games near you"
                         android:textColor="#6E6E6E"
-                        android:textSize="16sp" />
+                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <ImageButton
+                    android:id="@+id/toggleActiveGamesButton"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Toggle"
+                    android:rotation="180"
+                    android:src="@android:drawable/arrow_down_float" />
+
+                <ImageButton
                     android:id="@+id/closeActiveGamesButton"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:background="@android:color/transparent"
                     android:contentDescription="Close"
                     android:src="@android:drawable/ic_menu_close_clear_cancel" />
             </LinearLayout>
 
-            <View
+            <LinearLayout
+                android:id="@+id/activeGamesContent"
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="14dp"
-                android:background="#E0E0E0" />
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="🔵 Your location"
-                android:textSize="16sp" />
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="🏀 Active game marker"
-                android:textSize="16sp" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="10dp"
+                    android:background="#E0E0E0" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="🔖 Saved court"
-                android:textSize="16sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="🔵 Your location"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="🏀 Active game marker"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="🔖 Saved court"
+                    android:textSize="14sp" />
+            </LinearLayout>
         </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>
@@ -213,50 +236,49 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/detailsCard"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginBottom="20dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="10dp"
         android:visibility="gone"
-        app:cardCornerRadius="26dp"
-        app:cardElevation="10dp"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="12dp"
+        app:layout_constraintTop_toTopOf="@id/detailsTopGuide"
         app:layout_constraintBottom_toBottomOf="@id/map"
         app:layout_constraintEnd_toEndOf="@id/map"
         app:layout_constraintStart_toStartOf="@id/map">
 
-        <ScrollView
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="match_parent"
+            android:fillViewport="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:background="@android:color/white">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="14dp">
 
-                    <LinearLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="#E8F0FE"
+                    <TextView
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
                         android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="👤"
-                            android:textSize="20sp" />
-                    </LinearLayout>
+                        android:text="👤"
+                        android:textSize="22sp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -264,23 +286,31 @@
                             android:id="@+id/hostNameText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:textSize="20sp"
                             android:textStyle="bold"
-                            android:textSize="22sp"
                             tools:text="David Cohen" />
 
                         <TextView
                             android:id="@+id/postedAgoText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#6E6E6E"
-                            android:textSize="16sp"
+                            android:textColor="#757575"
+                            android:textSize="15sp"
                             tools:text="30m ago" />
                     </LinearLayout>
 
                     <ImageButton
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:background="@android:color/transparent"
+                        android:contentDescription="Save"
+                        android:src="@android:drawable/btn_star_big_off" />
+
+                    <ImageButton
                         android:id="@+id/closeDetailsButton"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_marginStart="4dp"
                         android:background="@android:color/transparent"
                         android:contentDescription="Close"
                         android:src="@android:drawable/ic_menu_close_clear_cancel" />
@@ -288,143 +318,270 @@
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="160dp"
-                    android:layout_marginTop="16dp"
-                    android:background="#E8F0FE" />
+                    android:layout_height="180dp"
+                    android:background="#DCE8F5" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/sportChipText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="#DCE8FF"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="8dp"
-                        android:textColor="#2A5BD7"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        tools:text="Basketball" />
-
-                    <TextView
-                        android:id="@+id/joiningCountText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:textSize="16sp"
-                        tools:text="3 joining" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/titleText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    tools:text="Looking for 2 more players for 3v3" />
-
-                <TextView
-                    android:id="@+id/descriptionText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textSize="18sp"
-                    tools:text="Good lighting, great court!" />
-
-                <TextView
-                    android:id="@+id/locationText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:textSize="18sp"
-                    tools:text="Gordon Beach Basketball Court" />
-
-                <TextView
-                    android:id="@+id/coordinatesText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:textColor="#6E6E6E"
-                    android:textSize="15sp"
-                    tools:text="32.095300, 34.791800" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:text="I'm Coming!" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="18dp"
-                    android:background="#E0E0E0" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="Comments (1)"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:gravity="center"
-                        android:text="👤"
-                        android:textSize="18sp" />
+                    android:orientation="vertical"
+                    android:paddingStart="16dp"
+                    android:paddingTop="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="18dp">
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:background="#F3F3F3"
-                        android:orientation="vertical"
-                        android:padding="12dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <TextView
-                            android:id="@+id/commentAuthorText"
+                            android:id="@+id/sportChipText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:background="#DCE8FF"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="8dp"
+                            android:textColor="#2A5BD7"
+                            android:textSize="15sp"
                             android:textStyle="bold"
-                            android:textSize="17sp"
-                            tools:text="Sarah Levi" />
+                            tools:text="Basketball" />
 
                         <TextView
-                            android:id="@+id/commentBodyText"
-                            android:layout_width="match_parent"
+                            android:id="@+id/joiningCountText"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginStart="14dp"
+                            android:textColor="#555555"
                             android:textSize="16sp"
-                            tools:text="On my way! Be there in 10 mins" />
+                            tools:text="3 joining" />
                     </LinearLayout>
-                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/commentAgoText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="#6E6E6E"
-                    android:textSize="14sp"
-                    tools:text="15m ago" />
+                    <TextView
+                        android:id="@+id/titleText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        tools:text="Looking for 2 more players for 3v3." />
+
+                    <TextView
+                        android:id="@+id/descriptionText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#444444"
+                        android:textSize="16sp"
+                        tools:text="Good lighting, great court!" />
+
+                    <TextView
+                        android:id="@+id/locationText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:textColor="#444444"
+                        android:textSize="16sp"
+                        tools:text="Gordon Beach Basketball Court" />
+
+                    <TextView
+                        android:id="@+id/coordinatesText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#8A8A8A"
+                        android:textSize="14sp"
+                        tools:text="32.095300, 34.791800" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Rate this court:"
+                            android:textColor="#555555"
+                            android:textSize="15sp" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/star1"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="2dp"
+                                android:text="☆"
+                                android:textColor="#D4A000"
+                                android:textSize="24sp" />
+
+                            <TextView
+                                android:id="@+id/star2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="2dp"
+                                android:text="☆"
+                                android:textColor="#D4A000"
+                                android:textSize="24sp" />
+
+                            <TextView
+                                android:id="@+id/star3"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="2dp"
+                                android:text="☆"
+                                android:textColor="#D4A000"
+                                android:textSize="24sp" />
+
+                            <TextView
+                                android:id="@+id/star4"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="2dp"
+                                android:text="☆"
+                                android:textColor="#D4A000"
+                                android:textSize="24sp" />
+
+                            <TextView
+                                android:id="@+id/star5"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:paddingHorizontal="2dp"
+                                android:text="☆"
+                                android:textColor="#D4A000"
+                                android:textSize="24sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/ratingValueText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:text="4.5"
+                            android:textColor="#555555"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/joinButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="I'm Coming!" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="18dp"
+                        android:background="#E0E0E0" />
+
+                    <TextView
+                        android:id="@+id/commentsTitleText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="Comments (1)"
+                        android:textSize="19sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:gravity="center"
+                            android:text="👤"
+                            android:textSize="18sp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:background="#F4F4F4"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <TextView
+                                android:id="@+id/commentAuthorText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                tools:text="Sarah Levi" />
+
+                            <TextView
+                                android:id="@+id/commentBodyText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:textColor="#444444"
+                                android:textSize="16sp"
+                                tools:text="On my way! Be there in 10 mins" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/commentAgoText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="44dp"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#8A8A8A"
+                        android:textSize="14sp"
+                        tools:text="15m ago" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/commentInput"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/comment_input_background"
+                            android:gravity="center_vertical"
+                            android:hint="Add a comment..."
+                            android:paddingHorizontal="16dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/sendCommentButton"
+                            android:layout_width="96dp"
+                            android:layout_height="52dp"
+                            android:layout_marginStart="10dp"
+                            android:text="Send" />
+                    </LinearLayout>
+
+                </LinearLayout>
             </LinearLayout>
 
-        </ScrollView>
+        </androidx.core.widget.NestedScrollView>
 
     </com.google.android.material.card.MaterialCardView>
 
