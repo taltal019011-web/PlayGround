@@ -7,6 +7,7 @@ import com.example.playground.data.Event
 class EventRepository(context: Context) {
     private val db = AppDatabase.getInstance(context)
     private val eventDao = db.eventDao()
+    private val commentDao = db.commentDao()
 
     sealed class EventResult {
         data class Success(val eventId: Long) : EventResult()
@@ -44,6 +45,20 @@ class EventRepository(context: Context) {
         eventDao.deleteEvent(event)
         return EventResult.Success(event.id)
     }
+
+    fun postComment(eventId: Long, authorId: Long, content: String): EventResult {
+        val comment = com.example.playground.data.Comment(
+            eventId = eventId,
+            authorId = authorId,
+            content = content,
+            timestamp = System.currentTimeMillis()
+        )
+        val id = commentDao.insertComment(comment)
+        return EventResult.Success(id)
+    }
+
+    fun getCommentsForEvent(eventId: Long): List<com.example.playground.data.Comment> = 
+        commentDao.getCommentsByEvent(eventId)
 
     companion object {
         @Volatile

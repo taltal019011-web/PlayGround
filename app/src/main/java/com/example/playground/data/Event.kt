@@ -28,5 +28,6 @@ data class Event(
     val latitude: Double,
     val longitude: Double,
     val locationLabel: String,
+    val address: String? = null,
     val published: Boolean = true
 )
