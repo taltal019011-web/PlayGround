@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView android:id="@+id/titleText" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" />
+    <TextView android:id="@+id/descriptionText" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" />
+    
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Comments" android:textStyle="bold" />
+    <TextView android:id="@+id/commentListText" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    
+    <com.google.android.material.textfield.TextInputEditText android:id="@+id/commentInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Write a comment..." />
+    <com.google.android.material.button.MaterialButton android:id="@+id/addCommentButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Post Comment" />
+</LinearLayout>
