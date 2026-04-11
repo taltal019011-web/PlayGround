@@ -6,11 +6,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.example.playground.R
 import com.example.playground.auth.AuthManager
-import com.example.playground.data.Comment
 import com.example.playground.data.Event
 import com.example.playground.repository.EventRepository
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -35,6 +33,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var commentInput: TextInputEditText
     private lateinit var addCommentButton: MaterialButton
     private lateinit var commentListText: TextView
+    private lateinit var locationText: TextView
 
     private var selectedEvent: Event? = null
 
@@ -51,9 +50,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         closeDetailsButton = view.findViewById(R.id.closeDetailsButton)
         titleText = view.findViewById(R.id.titleText)
         descriptionText = view.findViewById(R.id.descriptionText)
-        commentInput = view.findViewById(R.id.commentInput) // Assuming we add this to your layout
-        addCommentButton = view.findViewById(R.id.addCommentButton) // Assuming we add this
-        commentListText = view.findViewById(R.id.commentListText) // Assuming we add this
+        locationText = view.findViewById(R.id.locationText)
+        commentInput = view.findViewById(R.id.commentInput)
+        addCommentButton = view.findViewById(R.id.addCommentButton)
+        commentListText = view.findViewById(R.id.commentListText)
 
         closeDetailsButton.setOnClickListener { detailsCard.visibility = View.GONE }
 
@@ -75,6 +75,19 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
+        val telAviv = LatLng(32.0853, 34.7818)
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(telAviv, 12.5f))
+
+        map.setOnMarkerClickListener { marker ->
+            selectedEvent = marker.tag as? Event
+            selectedEvent?.let { 
+                showDetails(it)
+                googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 13.5f))
+            }
+            true
+        }
+
+        map.setOnMapClickListener { detailsCard.visibility = View.GONE }
         refreshEvents()
     }
 
@@ -85,11 +98,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             val marker = googleMap?.addMarker(MarkerOptions().position(LatLng(event.latitude, event.longitude)).title(event.title))
             marker?.tag = event
         }
-        googleMap?.setOnMarkerClickListener { marker ->
-            selectedEvent = marker.tag as? Event
-            selectedEvent?.let { showDetails(it) }
-            true
-        }
     }
 
     private fun showDetails(event: Event) {
@@ -97,12 +105,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         detailsCard.visibility = View.VISIBLE
         titleText.text = event.title
         descriptionText.text = event.description
+        locationText.text = event.locationLabel
         refreshComments(event.id)
     }
 
     private fun refreshComments(eventId: Long) {
         val comments = eventRepository.getCommentsForEvent(eventId)
-        commentListText.text = comments.joinToString("
-") { "${it.content} (${it.timestamp})" }
+        commentListText.text = comments.joinToString("\n") { "${it.content} (by ${it.authorId})" }
     }
 }
