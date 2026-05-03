@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "853547212309",
+    "project_id": "playground-da88b",
+    "storage_bucket": "playground-da88b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853547212309:android:6b045cdea089b7eb46781c",
+        "android_client_info": {
+          "package_name": "com.example.playground"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAAe7B3aGJZ22PRpnJ39DYdoJmvSxiohDw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
