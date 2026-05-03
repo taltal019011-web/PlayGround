@@ -60,8 +60,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var addCommentButton: MaterialButton
     private lateinit var imComingButton: MaterialButton
 
-    private lateinit var eventImageView: android.widget.ImageView
-
     private var allEvents: List<Event> = emptyList()
     private var selectedEvent: Event? = null
 
@@ -101,7 +99,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         commentInput = view.findViewById(R.id.commentInput)
         addCommentButton = view.findViewById(R.id.addCommentButton)
         imComingButton = view.findViewById(R.id.imComingButton)
-        eventImageView = view.findViewById(R.id.eventImageView)
 
         closeActiveGamesButton.setOnClickListener { activeGamesCard.visibility = View.GONE }
         closeDetailsButton.setOnClickListener { detailsCard.visibility = View.GONE }
@@ -214,24 +211,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         detailsCard.visibility = View.VISIBLE
 
         hostNameText.text = "Host #${event.hostId}"
-        postedAgoText.text = formatEventTime(event.startTime)
+        postedAgoText.text = formatTimeAgo(event.startTime)
         sportChipText.text = event.sport
         joiningCountText.text = "Max ${event.maxPlayers} players"
         titleText.text = event.title
         descriptionText.text = event.description ?: ""
         locationText.text = event.locationLabel
         coordinatesText.text = "%.3f, %.3f".format(event.latitude, event.longitude)
-
-        if (event.imageUri != null) {
-            try {
-                eventImageView.setImageURI(android.net.Uri.parse(event.imageUri))
-                eventImageView.visibility = View.VISIBLE
-            } catch (e: Exception) {
-                eventImageView.visibility = View.GONE
-            }
-        } else {
-            eventImageView.visibility = View.GONE
-        }
 
         imComingButton.text = "I'm Coming!"
         imComingButton.isEnabled = true
@@ -294,14 +280,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
-    private fun formatEventTime(timestamp: Long): String {
-        val diff = timestamp - System.currentTimeMillis()
+    private fun formatTimeAgo(timestamp: Long): String {
+        val diff = System.currentTimeMillis() - timestamp
         val minutes = diff / 60_000
         return when {
-            diff < 0 -> "Past event"
-            minutes < 60 -> "In ${minutes}m"
-            minutes < 1440 -> "In ${minutes / 60}h"
-            else -> "In ${minutes / 1440}d"
+            minutes < 60 -> "${minutes}m ago"
+            minutes < 1440 -> "${minutes / 60}h ago"
+            else -> "${minutes / 1440}d ago"
         }
     }
 }

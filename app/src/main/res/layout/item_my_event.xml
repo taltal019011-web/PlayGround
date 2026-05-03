@@ -104,42 +104,5 @@
                 tools:text="👥 Max 10" />
         </LinearLayout>
 
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="14dp"
-            android:background="#EEEEEE" />
-
-        <!-- Edit / Delete buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/editButton"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:text="Edit"
-                android:textColor="#2A5BD7"
-                app:strokeColor="#2A5BD7" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/deleteButton"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Delete"
-                android:textColor="#D32F2F"
-                app:strokeColor="#D32F2F" />
-
-        </LinearLayout>
-
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
