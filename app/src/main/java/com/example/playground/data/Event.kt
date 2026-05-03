@@ -25,6 +25,7 @@ data class Event(
     val description: String?,
     val startTime: Long, // Timestamp
     val maxPlayers: Int,
+    val imageUri: String? = null,
     val latitude: Double,
     val longitude: Double,
     val locationLabel: String,
