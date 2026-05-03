@@ -18,6 +18,9 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import android.app.AlertDialog
+import android.net.Uri
+import android.widget.ImageView
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MyPostsFragment : Fragment() {
 
@@ -78,6 +81,31 @@ class MyPostsFragment : Fragment() {
             .show()
     }
 
+    private var editImageUri: Uri? = null
+
+    private val editPickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let {
+                val permanentUri = copyImageToAppStorage(it) ?: it
+                editImageUri = permanentUri
+                editImageView?.setImageURI(permanentUri)
+                editImageView?.visibility = View.VISIBLE
+            }
+        }
+
+    private var editImageView: ImageView? = null
+
+    private fun copyImageToAppStorage(uri: Uri): Uri? {
+        return try {
+            val inputStream = requireContext().contentResolver.openInputStream(uri) ?: return null
+            val file = java.io.File(requireContext().filesDir, "img_${System.currentTimeMillis()}.jpg")
+            file.outputStream().use { output -> inputStream.copyTo(output) }
+            Uri.fromFile(file)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun showEditDialog(event: Event) {
         val dialogView = LayoutInflater.from(requireContext())
             .inflate(R.layout.dialog_edit_event, null)
@@ -85,12 +113,29 @@ class MyPostsFragment : Fragment() {
         val titleEdit = dialogView.findViewById<TextInputEditText>(R.id.editTitle)
         val descriptionEdit = dialogView.findViewById<TextInputEditText>(R.id.editDescription)
         val maxPlayersEdit = dialogView.findViewById<TextInputEditText>(R.id.editMaxPlayers)
+        val selectImageButton = dialogView.findViewById<MaterialButton>(R.id.selectImageButton)
+        editImageView = dialogView.findViewById(R.id.selectedImageView)
 
         titleEdit.setText(event.title)
         descriptionEdit.setText(event.description ?: "")
         maxPlayersEdit.setText(event.maxPlayers.toString())
 
-        MaterialAlertDialogBuilder(requireContext())
+        // Load existing image
+        editImageUri = event.imageUri?.let { Uri.parse(it) }
+        editImageUri?.let {
+            try {
+                editImageView?.setImageURI(it)
+                editImageView?.visibility = View.VISIBLE
+            } catch (e: Exception) {
+                editImageView?.visibility = View.GONE
+            }
+        }
+
+        selectImageButton.setOnClickListener {
+            editPickImageLauncher.launch("image/*")
+        }
+
+        AlertDialog.Builder(requireContext())
             .setTitle("Edit Post")
             .setView(dialogView)
             .setNegativeButton("Cancel", null)
@@ -99,7 +144,8 @@ class MyPostsFragment : Fragment() {
                 val updatedEvent = event.copy(
                     title = titleEdit.text.toString().ifBlank { event.title },
                     description = descriptionEdit.text.toString(),
-                    maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers
+                    maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers,
+                    imageUri = editImageUri?.toString() ?: event.imageUri
                 )
                 when (val result = eventRepository.updateEvent(user.id, updatedEvent)) {
                     is EventRepository.EventResult.Success -> {
@@ -113,7 +159,6 @@ class MyPostsFragment : Fragment() {
             }
             .show()
     }
-
     class MyEventsAdapter(
         private val items: MutableList<Event>,
         private val onEdit: (Event) -> Unit,
