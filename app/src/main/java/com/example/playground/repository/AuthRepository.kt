@@ -8,7 +8,9 @@ class AuthRepository(context: Context) {
 
     private val authManager = AuthManager(context)
 
-    fun getCurrentUser(): User? = authManager.getCurrentUser()
+    suspend fun getCurrentUser(): User? = authManager.getCurrentUser()
+
+    suspend fun updateUser(user: User) = authManager.updateUser(user)
 
     companion object {
         @Volatile

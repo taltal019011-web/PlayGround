@@ -29,28 +29,28 @@ class CreateEventViewModel(
         locationLabel: String,
         imageUri: String? = null
     ) {
-        val currentUser = authRepository.getCurrentUser()
-        if (currentUser == null) {
-            _createEventState.value = CreateEventState.Error("User not logged in")
-            return
-        }
-
         _createEventState.value = CreateEventState.Loading
 
-        val event = Event(
-            hostId = currentUser.id,
-            sport = sport,
-            title = title,
-            description = description,
-            startTime = startTime,
-            maxPlayers = maxPlayers,
-            imageUri = imageUri,
-            latitude = latitude,
-            longitude = longitude,
-            locationLabel = locationLabel
-        )
-
         viewModelScope.launch {
+            val currentUser = authRepository.getCurrentUser()
+            if (currentUser == null) {
+                _createEventState.value = CreateEventState.Error("User not logged in")
+                return@launch
+            }
+
+            val event = Event(
+                hostId = currentUser.id,
+                sport = sport,
+                title = title,
+                description = description,
+                startTime = startTime,
+                maxPlayers = maxPlayers,
+                imageUri = imageUri,
+                latitude = latitude,
+                longitude = longitude,
+                locationLabel = locationLabel
+            )
+
             val result = eventRepository.createEvent(event)
             _createEventState.value = when (result) {
                 is EventRepository.EventResult.Success -> CreateEventState.Success(result.eventId)
@@ -62,7 +62,7 @@ class CreateEventViewModel(
     sealed class CreateEventState {
         object Idle : CreateEventState()
         object Loading : CreateEventState()
-        data class Success(val eventId: Long) : CreateEventState()
+        data class Success(val eventId: String) : CreateEventState()
         data class Error(val message: String) : CreateEventState()
     }
 }

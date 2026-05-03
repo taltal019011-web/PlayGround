@@ -1,16 +1,23 @@
 package com.example.playground.data
 
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
-@Entity(
-    tableName = "users",
-    indices = [Index(value = ["firebaseUid"], unique = true)]
-)
 data class User(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val firebaseUid: String,
-    val email: String,
+    val id: String = "",
+    val firebaseUid: String = "",
+    val email: String = "",
     val displayName: String = ""
-)
+) {
+    fun toMap(): Map<String, Any> = mapOf(
+        "firebaseUid" to firebaseUid,
+        "email" to email,
+        "displayName" to displayName
+    )
+
+    companion object {
+        fun fromMap(id: String, data: Map<String, Any?>): User = User(
+            id = id,
+            firebaseUid = data["firebaseUid"] as? String ?: "",
+            email = data["email"] as? String ?: "",
+            displayName = data["displayName"] as? String ?: ""
+        )
+    }
+}

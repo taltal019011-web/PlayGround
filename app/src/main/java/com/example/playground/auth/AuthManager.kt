@@ -2,17 +2,17 @@ package com.example.playground.auth
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.playground.data.AppDatabase
 import com.example.playground.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
 class AuthManager(context: Context) {
 
-    private val db = AppDatabase.getInstance(context)
-    private val userDao = db.userDao()
     private val firebaseAuth = FirebaseAuth.getInstance()
+    private val firestore = FirebaseFirestore.getInstance()
+    private val usersCollection = firestore.collection("users")
     private val prefs: SharedPreferences =
         context.getSharedPreferences("auth", Context.MODE_PRIVATE)
 
@@ -30,7 +30,7 @@ class AuthManager(context: Context) {
             val firebaseUser = result.user
                 ?: return AuthResult.Error("Sign up failed")
 
-            val user = saveLocalUser(firebaseUser)
+            val user = saveFirestoreUser(firebaseUser)
             prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
             firebaseAuth.signOut()
             AuthResult.Success(user)
@@ -48,7 +48,7 @@ class AuthManager(context: Context) {
             val firebaseUser = result.user
                 ?: return AuthResult.Error("Sign in failed")
 
-            val user = saveLocalUser(firebaseUser)
+            val user = saveFirestoreUser(firebaseUser)
             prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
             firebaseAuth.signOut()
             AuthResult.Success(user)
@@ -61,22 +61,42 @@ class AuthManager(context: Context) {
         prefs.edit().remove(KEY_FIREBASE_UID).apply()
     }
 
-    fun getCurrentUser(): User? {
+    suspend fun getCurrentUser(): User? {
         val uid = prefs.getString(KEY_FIREBASE_UID, null) ?: return null
-        return userDao.findByFirebaseUid(uid)
+        return try {
+            val snapshot = usersCollection
+                .whereEqualTo("firebaseUid", uid)
+                .get()
+                .await()
+            val doc = snapshot.documents.firstOrNull() ?: return null
+            User.fromMap(doc.id, doc.data ?: return null)
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    private fun saveLocalUser(firebaseUser: FirebaseUser): User {
-        val existing = userDao.findByFirebaseUid(firebaseUser.uid)
-        if (existing != null) return existing
+    suspend fun updateUser(user: User) {
+        usersCollection.document(user.id).update(user.toMap()).await()
+    }
+
+    private suspend fun saveFirestoreUser(firebaseUser: FirebaseUser): User {
+        val snapshot = usersCollection
+            .whereEqualTo("firebaseUid", firebaseUser.uid)
+            .get()
+            .await()
+
+        val existingDoc = snapshot.documents.firstOrNull()
+        if (existingDoc != null) {
+            return User.fromMap(existingDoc.id, existingDoc.data ?: emptyMap())
+        }
 
         val user = User(
             firebaseUid = firebaseUser.uid,
             email = firebaseUser.email ?: "",
             displayName = firebaseUser.displayName ?: ""
         )
-        val id = userDao.insertUser(user)
-        return user.copy(id = id)
+        val docRef = usersCollection.add(user.toMap()).await()
+        return user.copy(id = docRef.id)
     }
 
     companion object {

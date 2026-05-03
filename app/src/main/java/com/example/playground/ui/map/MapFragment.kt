@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.example.playground.R
 import com.example.playground.auth.AuthManager
 import com.example.playground.data.Event
@@ -32,6 +33,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.launch
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
@@ -88,9 +90,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var selectedEvent: Event? = null
     private var activeExpanded = true
 
-    private val joinedEventIds = mutableSetOf<Long>()
-    private val participantCounts = mutableMapOf<Long, Int>()
-    private val eventRatings = mutableMapOf<Long, Int>()
+    private val joinedEventIds = mutableSetOf<String>()
+    private val participantCounts = mutableMapOf<String, Int>()
+    private val eventRatings = mutableMapOf<String, Int>()
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
@@ -233,8 +235,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             closeDetails()
         }
 
-        allEvents = eventRepository.getAllEvents()
-        applyFilters()
+        lifecycleScope.launch {
+            allEvents = eventRepository.getAllEvents()
+            applyFilters()
+        }
         enableMyLocation()
     }
 
@@ -295,13 +299,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         val rating = eventRatings[event.id] ?: 4
 
         hostAvatarText.text = getSportEmoji(event.sport)
-        hostNameText.text = getHostDisplayName(event)
+        lifecycleScope.launch {
+            hostNameText.text = getHostDisplayName(event)
+        }
         postedAgoText.text = formatTimeAgo(event.startTime)
         sportChipText.text = event.sport
         joiningCountText.text = "$participantCount / ${event.maxPlayers} joining"
         titleText.text = event.title
         descriptionText.text = event.description ?: ""
-        locationText.text = "📍 ${event.locationLabel}"
+        locationText.text = "\uD83D\uDCCD ${event.locationLabel}"
         coordinatesText.text = "%.5f, %.5f".format(event.latitude, event.longitude)
 
         if (event.imageUri != null) {
@@ -342,26 +348,22 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         updateRatingViews(rating)
-        refreshComments(event.id)
+        lifecycleScope.launch {
+            refreshComments(event.id)
+        }
     }
 
-    private fun getHostDisplayName(event: Event): String {
+    private suspend fun getHostDisplayName(event: Event): String {
         val currentUser = authManager.getCurrentUser()
         return if (currentUser != null && currentUser.id == event.hostId) {
             currentUser.displayName.ifEmpty { currentUser.email }
         } else {
-            "Host #${event.hostId}"
+            "Host #${event.hostId.take(6)}"
         }
     }
 
     private fun getParticipantCount(event: Event): Int {
-        val existing = participantCounts[event.id]
-        if (existing != null) return existing
-
-        val commentsCount = eventRepository.getCommentsForEvent(event.id).size
-        val initialCount = commentsCount.coerceAtLeast(1).coerceAtMost(event.maxPlayers)
-        participantCounts[event.id] = initialCount
-        return initialCount
+        return participantCounts[event.id] ?: 1
     }
 
     private fun joinSelectedEvent() {
@@ -396,7 +398,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         stars.forEachIndexed { index, textView ->
             val selected = index < rating
-            textView.text = if (selected) "★" else "☆"
+            textView.text = if (selected) "\u2605" else "\u2606"
             textView.alpha = if (selected) 1f else 0.45f
         }
 
@@ -405,13 +407,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun addCommentToSelectedEvent() {
         val event = selectedEvent ?: return
-        val user = authManager.getCurrentUser() ?: return
         val text = commentInput.text.toString().trim()
 
         if (text.isNotBlank()) {
-            eventRepository.postComment(event.id, user.id, text)
-            commentInput.setText("")
-            refreshComments(event.id)
+            lifecycleScope.launch {
+                val user = authManager.getCurrentUser() ?: return@launch
+                eventRepository.postComment(event.id, user.id, text)
+                commentInput.setText("")
+                refreshComments(event.id)
+            }
         }
     }
 
@@ -493,7 +497,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         val venue = item.first
         val km = item.second / 1000
 
-        return "${venue.emoji} ${venue.name} • %.1f km".format(km)
+        return "${venue.emoji} ${venue.name} \u2022 %.1f km".format(km)
     }
 
     private fun getNearbyVenues(currentLocation: LatLng): List<Pair<Venue, Float>> {
@@ -512,7 +516,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }.sortedBy { it.second }
     }
 
-    private fun refreshComments(eventId: Long) {
+    private suspend fun refreshComments(eventId: String) {
         val comments = eventRepository.getCommentsForEvent(eventId)
         val currentUser = authManager.getCurrentUser()
 
@@ -523,7 +527,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             val authorName = if (currentUser != null && currentUser.id == comment.authorId) {
                 currentUser.displayName.ifEmpty { currentUser.email }
             } else {
-                "User ${comment.authorId}"
+                "User ${comment.authorId.take(6)}"
             }
 
             val row = LinearLayout(requireContext()).apply {
@@ -537,7 +541,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             }
 
             val avatar = TextView(requireContext()).apply {
-                text = "👤"
+                text = "\uD83D\uDC64"
                 textSize = 22f
                 gravity = Gravity.CENTER
                 setBackgroundColor(0xFFE8F0FE.toInt())
@@ -586,11 +590,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun getSportEmoji(sport: String): String {
         return when (sport.lowercase()) {
-            "basketball" -> "🏀"
-            "football" -> "⚽"
-            "tennis" -> "🎾"
-            "volleyball" -> "🏐"
-            else -> "👤"
+            "basketball" -> "\uD83C\uDFC0"
+            "football" -> "\u26BD"
+            "tennis" -> "\uD83C\uDFBE"
+            "volleyball" -> "\uD83C\uDFD0"
+            else -> "\uD83D\uDC64"
         }
     }
 

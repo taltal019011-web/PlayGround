@@ -7,12 +7,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.example.playground.auth.AuthManager
 import com.example.playground.ui.home.CreateEventFragment
 import com.example.playground.ui.map.MapFragment
 import com.example.playground.ui.myposts.MyPostsFragment
 import com.example.playground.ui.profile.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,28 +33,30 @@ class MainActivity : AppCompatActivity() {
 
         authManager = AuthManager(this)
 
-        val currentUser = authManager.getCurrentUser()
-        if (currentUser == null) {
-            startActivity(Intent(this, SignInActivity::class.java))
-            finish()
-            return
-        }
-
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-
-        bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_map -> replaceFragment(MapFragment())
-                R.id.nav_create -> replaceFragment(CreateEventFragment())
-                R.id.nav_my_posts -> replaceFragment(MyPostsFragment())
-                R.id.nav_profile -> replaceFragment(ProfileFragment())
+        lifecycleScope.launch {
+            val currentUser = authManager.getCurrentUser()
+            if (currentUser == null) {
+                startActivity(Intent(this@MainActivity, SignInActivity::class.java))
+                finish()
+                return@launch
             }
-            true
-        }
 
-        if (savedInstanceState == null) {
-            replaceFragment(MapFragment())
-            bottomNav.selectedItemId = R.id.nav_map
+            val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+
+            bottomNav.setOnItemSelectedListener { item ->
+                when (item.itemId) {
+                    R.id.nav_map -> replaceFragment(MapFragment())
+                    R.id.nav_create -> replaceFragment(CreateEventFragment())
+                    R.id.nav_my_posts -> replaceFragment(MyPostsFragment())
+                    R.id.nav_profile -> replaceFragment(ProfileFragment())
+                }
+                true
+            }
+
+            if (savedInstanceState == null) {
+                replaceFragment(MapFragment())
+                bottomNav.selectedItemId = R.id.nav_map
+            }
         }
     }
 

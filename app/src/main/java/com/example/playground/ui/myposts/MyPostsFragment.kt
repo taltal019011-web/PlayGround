@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.playground.R
@@ -21,6 +22,7 @@ import android.app.AlertDialog
 import android.net.Uri
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
 
 class MyPostsFragment : Fragment() {
 
@@ -45,19 +47,21 @@ class MyPostsFragment : Fragment() {
     }
 
     private fun loadEvents() {
-        val user = authManager.getCurrentUser() ?: return
-        val myEvents = eventRepository.getAllEvents().filter { it.hostId == user.id }
-        if (myEvents.isEmpty()) {
-            recyclerView.visibility = View.GONE
-            emptyText.visibility = View.VISIBLE
-        } else {
-            recyclerView.visibility = View.VISIBLE
-            emptyText.visibility = View.GONE
-            recyclerView.adapter = MyEventsAdapter(
-                items = myEvents.toMutableList(),
-                onEdit = { event -> showEditDialog(event) },
-                onDelete = { event -> showDeleteDialog(event) }
-            )
+        lifecycleScope.launch {
+            val user = authManager.getCurrentUser() ?: return@launch
+            val myEvents = eventRepository.getAllEvents().filter { it.hostId == user.id }
+            if (myEvents.isEmpty()) {
+                recyclerView.visibility = View.GONE
+                emptyText.visibility = View.VISIBLE
+            } else {
+                recyclerView.visibility = View.VISIBLE
+                emptyText.visibility = View.GONE
+                recyclerView.adapter = MyEventsAdapter(
+                    items = myEvents.toMutableList(),
+                    onEdit = { event -> showEditDialog(event) },
+                    onDelete = { event -> showDeleteDialog(event) }
+                )
+            }
         }
     }
 
@@ -67,14 +71,16 @@ class MyPostsFragment : Fragment() {
             .setMessage("Are you sure you want to delete \"${event.title}\"?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Delete") { _, _ ->
-                val user = authManager.getCurrentUser() ?: return@setPositiveButton
-                when (val result = eventRepository.deleteEvent(user.id, event)) {
-                    is EventRepository.EventResult.Success -> {
-                        Toast.makeText(context, "Post deleted", Toast.LENGTH_SHORT).show()
-                        loadEvents()
-                    }
-                    is EventRepository.EventResult.Error -> {
-                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    val user = authManager.getCurrentUser() ?: return@launch
+                    when (val result = eventRepository.deleteEvent(user.id, event)) {
+                        is EventRepository.EventResult.Success -> {
+                            Toast.makeText(context, "Post deleted", Toast.LENGTH_SHORT).show()
+                            loadEvents()
+                        }
+                        is EventRepository.EventResult.Error -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -120,7 +126,6 @@ class MyPostsFragment : Fragment() {
         descriptionEdit.setText(event.description ?: "")
         maxPlayersEdit.setText(event.maxPlayers.toString())
 
-        // Load existing image
         editImageUri = event.imageUri?.let { Uri.parse(it) }
         editImageUri?.let {
             try {
@@ -140,25 +145,28 @@ class MyPostsFragment : Fragment() {
             .setView(dialogView)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Save") { _, _ ->
-                val user = authManager.getCurrentUser() ?: return@setPositiveButton
-                val updatedEvent = event.copy(
-                    title = titleEdit.text.toString().ifBlank { event.title },
-                    description = descriptionEdit.text.toString(),
-                    maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers,
-                    imageUri = editImageUri?.toString() ?: event.imageUri
-                )
-                when (val result = eventRepository.updateEvent(user.id, updatedEvent)) {
-                    is EventRepository.EventResult.Success -> {
-                        Toast.makeText(context, "Post updated", Toast.LENGTH_SHORT).show()
-                        loadEvents()
-                    }
-                    is EventRepository.EventResult.Error -> {
-                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    val user = authManager.getCurrentUser() ?: return@launch
+                    val updatedEvent = event.copy(
+                        title = titleEdit.text.toString().ifBlank { event.title },
+                        description = descriptionEdit.text.toString(),
+                        maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers,
+                        imageUri = editImageUri?.toString() ?: event.imageUri
+                    )
+                    when (val result = eventRepository.updateEvent(user.id, updatedEvent)) {
+                        is EventRepository.EventResult.Success -> {
+                            Toast.makeText(context, "Post updated", Toast.LENGTH_SHORT).show()
+                            loadEvents()
+                        }
+                        is EventRepository.EventResult.Error -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
             .show()
     }
+
     class MyEventsAdapter(
         private val items: MutableList<Event>,
         private val onEdit: (Event) -> Unit,
@@ -188,8 +196,8 @@ class MyPostsFragment : Fragment() {
             holder.timeText.text = formatTimeAgo(event.startTime)
             holder.titleText.text = event.title
             holder.descriptionText.text = event.description ?: ""
-            holder.locationText.text = "📍 ${event.locationLabel}"
-            holder.playersText.text = "👥 Max ${event.maxPlayers}"
+            holder.locationText.text = "\uD83D\uDCCD ${event.locationLabel}"
+            holder.playersText.text = "\uD83D\uDC65 Max ${event.maxPlayers}"
             holder.editButton.setOnClickListener { onEdit(event) }
             holder.deleteButton.setOnClickListener { onDelete(event) }
         }

@@ -8,7 +8,7 @@ class AuthManagerTest {
     @Test
     fun authResult_success_holdsUser() {
         val user = com.example.playground.data.User(
-            id = 1L,
+            id = "test-id",
             firebaseUid = "test-uid",
             email = "test@example.com",
             displayName = "Test User"
