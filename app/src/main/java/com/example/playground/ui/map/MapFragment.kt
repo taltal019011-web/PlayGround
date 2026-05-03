@@ -599,14 +599,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun formatTimeAgo(timestamp: Long): String {
-        val diff = System.currentTimeMillis() - timestamp
+        val diff = timestamp - System.currentTimeMillis()
         val minutes = diff / 60_000
-
         return when {
-            minutes < 0 -> "just now"
-            minutes < 60 -> "${minutes}m ago"
-            minutes < 1440 -> "${minutes / 60}h ago"
-            else -> "${minutes / 1440}d ago"
+            diff < 0 -> "Past event"
+            minutes < 60 -> "In ${minutes}m"
+            minutes < 1440 -> "In ${minutes / 60}h"
+            else -> "In ${minutes / 1440}d"
         }
     }
 }
