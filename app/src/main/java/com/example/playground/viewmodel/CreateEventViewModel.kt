@@ -26,7 +26,8 @@ class CreateEventViewModel(
         maxPlayers: Int,
         latitude: Double,
         longitude: Double,
-        locationLabel: String
+        locationLabel: String,
+        imageUri: String? = null
     ) {
         val currentUser = authRepository.getCurrentUser()
         if (currentUser == null) {
@@ -43,6 +44,7 @@ class CreateEventViewModel(
             description = description,
             startTime = startTime,
             maxPlayers = maxPlayers,
+            imageUri = imageUri,
             latitude = latitude,
             longitude = longitude,
             locationLabel = locationLabel

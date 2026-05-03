@@ -81,6 +81,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var addCommentButton: MaterialButton
     private lateinit var imComingButton: MaterialButton
 
+    private lateinit var eventImageView: android.widget.ImageView
+
     private var allEvents: List<Event> = emptyList()
     private var selectedSport: String = "All"
     private var selectedEvent: Event? = null
@@ -156,6 +158,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         commentInput = view.findViewById(R.id.commentInput)
         addCommentButton = view.findViewById(R.id.addCommentButton)
         imComingButton = view.findViewById(R.id.imComingButton)
+        eventImageView = view.findViewById(R.id.eventImageView)
     }
 
     private fun setupActions() {
@@ -300,6 +303,17 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         descriptionText.text = event.description ?: ""
         locationText.text = "📍 ${event.locationLabel}"
         coordinatesText.text = "%.5f, %.5f".format(event.latitude, event.longitude)
+
+        if (event.imageUri != null) {
+            try {
+                eventImageView.setImageURI(android.net.Uri.parse(event.imageUri))
+                eventImageView.visibility = View.VISIBLE
+            } catch (e: Exception) {
+                eventImageView.visibility = View.GONE
+            }
+        } else {
+            eventImageView.visibility = View.GONE
+        }
 
         when {
             isJoined -> {
