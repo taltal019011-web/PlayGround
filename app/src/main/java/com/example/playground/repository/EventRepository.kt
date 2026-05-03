@@ -157,6 +157,9 @@ class EventRepository(context: Context) {
         val host = userDao.findById(event.hostId)
         val hostUid = host?.firebaseUid ?: ""
         eventsCollection.document(event.id.toString()).set(event.toFirestoreMap(hostUid))
+            .addOnFailureListener { e ->
+                android.util.Log.e("EventRepository", "Failed to sync event to Firestore", e)
+            }
     }
 
     private fun syncCommentToFirestore(comment: Comment) {
@@ -164,6 +167,9 @@ class EventRepository(context: Context) {
         val authorUid = author?.firebaseUid ?: ""
         commentsCollection.document(comment.id.toString())
             .set(comment.toFirestoreMap(comment.eventId.toString(), authorUid))
+            .addOnFailureListener { e ->
+                android.util.Log.e("EventRepository", "Failed to sync comment to Firestore", e)
+            }
     }
 
     fun joinEvent(eventId: Long, userId: Long) {
