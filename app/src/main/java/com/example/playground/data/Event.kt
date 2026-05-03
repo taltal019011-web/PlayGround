@@ -48,7 +48,8 @@ data class Event(
     )
 
     companion object {
-        fun fromFirestoreMap(data: Map<String, Any?>): Event = Event(
+        fun fromFirestoreMap(data: Map<String, Any?>, localHostId: Long): Event = Event(
+            hostId = localHostId,
             sport = data["sport"] as? String ?: "",
             title = data["title"] as? String ?: "",
             description = data["description"] as? String,
@@ -59,8 +60,7 @@ data class Event(
             longitude = (data["longitude"] as? Double) ?: 0.0,
             locationLabel = data["locationLabel"] as? String ?: "",
             address = data["address"] as? String,
-            published = (data["published"] as? Boolean) ?: true,
-            hostId = 0
+            published = (data["published"] as? Boolean) ?: true
         )
     }
 }

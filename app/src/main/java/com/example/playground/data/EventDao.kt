@@ -25,4 +25,7 @@ interface EventDao {
 
     @Query("SELECT * FROM events WHERE hostId = :hostId ORDER BY startTime ASC")
     fun getEventsByHost(hostId: Long): List<Event>
+
+    @Query("DELETE FROM events")
+    fun deleteAll()
 }
