@@ -94,6 +94,12 @@ class AuthManager(context: Context) {
 
     private fun syncUserToFirestore(user: User) {
         usersCollection.document(user.firebaseUid).set(user.toFirestoreMap())
+            .addOnSuccessListener {
+                android.util.Log.d("AuthManager", "User synced to Firestore: ${user.firebaseUid}")
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("AuthManager", "Failed to sync user to Firestore", e)
+            }
     }
 
     companion object {
