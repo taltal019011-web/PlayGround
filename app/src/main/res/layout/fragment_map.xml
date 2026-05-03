@@ -270,14 +270,11 @@
                 </LinearLayout>
 
                 <!-- Image placeholder -->
-                <ImageView
-                    android:id="@+id/eventImageView"
+                <View
                     android:layout_width="match_parent"
                     android:layout_height="120dp"
                     android:layout_marginTop="14dp"
-                    android:background="#EEF2FF"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
+                    android:background="#EEF2FF" />
 
                 <!-- Sport chip + players -->
                 <LinearLayout
