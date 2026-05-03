@@ -3,6 +3,7 @@
     <string name="sign_up_title">Create Account</string>
     <string name="sign_in_title">Welcome Back</string>
     <string name="hint_username">Username</string>
+    <string name="hint_email">Email</string>
     <string name="hint_password">Password</string>
     <string name="action_sign_up">Sign Up</string>
     <string name="action_sign_in">Sign In</string>
