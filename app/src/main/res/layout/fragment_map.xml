@@ -166,12 +166,14 @@
                     android:textColor="#6E6E6E"
                     android:textSize="14sp" />
 
-                <View
+                <ImageView
+                    android:id="@+id/eventImageView"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="12dp"
-                    android:background="#D7CCD9" />
-
+                    android:layout_height="190dp"
+                    android:background="#EEF2FF"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+                
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

@@ -23,7 +23,8 @@ data class Event(
     val sport: String,
     val title: String,
     val description: String?,
-    val startTime: Long, // Timestamp
+    val imageUri: String? = null,  // ADD THIS
+    val startTime: Long,
     val maxPlayers: Int,
     val latitude: Double,
     val longitude: Double,

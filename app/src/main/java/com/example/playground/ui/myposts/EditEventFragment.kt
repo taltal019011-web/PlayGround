@@ -166,7 +166,7 @@ class EditEventFragment : Fragment() {
                 val filtered = Venues.all.filter { v ->
                     v.sports.isEmpty() || v.sports.any { it.equals(sport, ignoreCase = true) }
                 }
-                venueAdapter?.updateList(filtered)
+                venueAdapter?.updateList(filtered, null)
                 if (selectedVenue != null && filtered.none { it.name == selectedVenue!!.name }) {
                     selectedVenue = null
                     selectedLocationCard.visibility = View.GONE
