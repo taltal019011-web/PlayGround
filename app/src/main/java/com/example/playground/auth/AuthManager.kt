@@ -35,7 +35,6 @@ class AuthManager(context: Context) {
 
             val user = saveLocalUser(firebaseUser)
             prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
-            firebaseAuth.signOut()
             AuthResult.Success(user)
         } catch (e: Exception) {
             AuthResult.Error(e.message ?: "Sign up failed")
@@ -53,7 +52,6 @@ class AuthManager(context: Context) {
 
             val user = saveLocalUser(firebaseUser)
             prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
-            firebaseAuth.signOut()
             AuthResult.Success(user)
         } catch (e: Exception) {
             AuthResult.Error(e.message ?: "Sign in failed")
@@ -62,6 +60,7 @@ class AuthManager(context: Context) {
 
     fun signOut() {
         prefs.edit().remove(KEY_FIREBASE_UID).apply()
+        firebaseAuth.signOut()
     }
 
     fun getCurrentUser(): User? {
@@ -94,6 +93,12 @@ class AuthManager(context: Context) {
 
     private fun syncUserToFirestore(user: User) {
         usersCollection.document(user.firebaseUid).set(user.toFirestoreMap())
+            .addOnSuccessListener {
+                android.util.Log.d("AuthManager", "User synced to Firestore: ${user.firebaseUid}")
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("AuthManager", "Failed to sync user to Firestore", e)
+            }
     }
 
     companion object {
