@@ -1,11 +1,18 @@
 package com.example.playground.ui.home
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,12 +27,50 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
+import android.content.Intent
 
 class CreateEventFragment : Fragment() {
 
     private lateinit var viewModel: CreateEventViewModel
     private var selectedVenue: Venue? = null
+    private var selectedImageUri: Uri? = null
+    private var selectedImageView: ImageView? = null
     private var venueAdapter: VenueAdapter? = null
+
+    // ---- Image picker launcher ----
+    private fun copyImageToAppStorage(uri: Uri): Uri? {
+        return try {
+            val inputStream = requireContext().contentResolver.openInputStream(uri) ?: return null
+            val file = java.io.File(requireContext().filesDir, "img_${System.currentTimeMillis()}.jpg")
+            file.outputStream().use { output -> inputStream.copyTo(output) }
+            Uri.fromFile(file)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let {
+                val permanentUri = copyImageToAppStorage(it) ?: it
+                selectedImageUri = permanentUri
+                selectedImageView?.setImageURI(permanentUri)
+                selectedImageView?.visibility = View.VISIBLE
+            }
+        }
+
+    // ---- Permission request launcher ----
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                pickImageLauncher.launch("image/*")
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Permission denied — cannot access images",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -49,13 +94,21 @@ class CreateEventFragment : Fragment() {
         val selectedLocationName = view.findViewById<TextView>(R.id.selectedLocationName)
         val selectedLocationCoords = view.findViewById<TextView>(R.id.selectedLocationCoords)
         val clearLocationButton = view.findViewById<TextView>(R.id.clearLocationButton)
+        val selectImageButton = view.findViewById<MaterialButton>(R.id.selectImageButton)
+        selectedImageView = view.findViewById(R.id.selectedImageView)
+
+        // ---- Image button with runtime permission ----
+        selectImageButton.setOnClickListener {
+            openImagePicker()
+        }
 
         // Setup venue list
         venueAdapter = VenueAdapter(Venues.all) { venue ->
             selectedVenue = venue
             selectedLocationCard.visibility = View.VISIBLE
             selectedLocationName.text = venue.name
-            selectedLocationCoords.text = "%.4f, %.4f · ${venue.area}".format(venue.latitude, venue.longitude)
+            selectedLocationCoords.text =
+                "%.4f, %.4f · ${venue.area}".format(venue.latitude, venue.longitude)
             venueAdapter?.setSelected(venue)
         }
 
@@ -63,7 +116,6 @@ class CreateEventFragment : Fragment() {
         venueRecycler.adapter = venueAdapter
         venueRecycler.isNestedScrollingEnabled = false
 
-        // Filter venues when sport chip changes
         sportGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isNotEmpty()) {
                 val chip = view.findViewById<Chip>(checkedIds.first())
@@ -74,7 +126,6 @@ class CreateEventFragment : Fragment() {
                     v.sports.isEmpty() || v.sports.any { it.equals(sport, ignoreCase = true) }
                 }
                 venueAdapter?.updateList(filtered)
-                // Clear selection if selected venue doesn't match new sport
                 if (selectedVenue != null && filtered.none { it.name == selectedVenue!!.name }) {
                     selectedVenue = null
                     selectedLocationCard.visibility = View.GONE
@@ -116,7 +167,8 @@ class CreateEventFragment : Fragment() {
                 maxPlayers = maxPlayers,
                 latitude = venue.latitude,
                 longitude = venue.longitude,
-                locationLabel = venue.name
+                locationLabel = venue.name,
+                imageUri = selectedImageUri?.toString()  // ADD THIS
             )
 
             Toast.makeText(context, "Event created!", Toast.LENGTH_SHORT).show()
@@ -127,12 +179,37 @@ class CreateEventFragment : Fragment() {
             descriptionEdit.setText("")
             maxPlayersEdit.setText("")
             selectedVenue = null
+            selectedImageUri = null
+            selectedImageView?.visibility = View.GONE
             selectedLocationCard.visibility = View.GONE
             venueAdapter?.updateList(Venues.all)
             venueAdapter?.setSelected(null)
         }
     }
 
+    // ---- Permission helper ----
+    private fun openImagePicker() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // Android 14+ — use the Photo Picker directly, no permission needed
+            pickImageLauncher.launch("image/*")
+            return
+        }
+
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.READ_MEDIA_IMAGES
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
+
+        when {
+            ContextCompat.checkSelfPermission(requireContext(), permission)
+                    == PackageManager.PERMISSION_GRANTED -> pickImageLauncher.launch("image/*")
+            shouldShowRequestPermissionRationale(permission) -> {
+                Toast.makeText(requireContext(), "Permission needed to select images", Toast.LENGTH_LONG).show()
+                requestPermissionLauncher.launch(permission)
+            }
+            else -> requestPermissionLauncher.launch(permission)
+        }
+    }
     // ---- Adapter ----
 
     class VenueAdapter(
@@ -161,7 +238,8 @@ class CreateEventFragment : Fragment() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_venue, parent, false)
+            val v = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_venue, parent, false)
             return VH(v)
         }
 
