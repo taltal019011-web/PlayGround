@@ -348,7 +348,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private fun getHostDisplayName(event: Event): String {
         val currentUser = authManager.getCurrentUser()
         return if (currentUser != null && currentUser.id == event.hostId) {
-            currentUser.username
+            currentUser.displayName.ifEmpty { currentUser.email }
         } else {
             "Host #${event.hostId}"
         }
@@ -521,7 +521,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         for (comment in comments) {
             val authorName = if (currentUser != null && currentUser.id == comment.authorId) {
-                currentUser.username
+                currentUser.displayName.ifEmpty { currentUser.email }
             } else {
                 "User ${comment.authorId}"
             }
