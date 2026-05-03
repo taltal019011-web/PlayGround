@@ -6,9 +6,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.playground.auth.AuthManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.launch
 
 class SignInActivity : AppCompatActivity() {
 
@@ -26,30 +28,34 @@ class SignInActivity : AppCompatActivity() {
 
         authManager = AuthManager(this)
 
-        val usernameLayout = findViewById<TextInputLayout>(R.id.usernameLayout)
+        val emailLayout = findViewById<TextInputLayout>(R.id.usernameLayout)
         val passwordLayout = findViewById<TextInputLayout>(R.id.passwordLayout)
         val signInButton = findViewById<MaterialButton>(R.id.signInButton)
         val signUpLink = findViewById<MaterialButton>(R.id.signUpLink)
 
         signInButton.setOnClickListener {
-            usernameLayout.error = null
+            emailLayout.error = null
             passwordLayout.error = null
 
-            val username = usernameLayout.editText?.text.toString().trim()
+            val email = emailLayout.editText?.text.toString().trim()
             val password = passwordLayout.editText?.text.toString()
 
-            when (val result = authManager.signIn(username, password)) {
-                is AuthManager.AuthResult.Success -> {
-                    startActivity(Intent(this, MainActivity::class.java))
-                    finish()
-                }
-                is AuthManager.AuthResult.Error -> {
-                    when {
-                        result.message.contains("Username is required") ->
-                            usernameLayout.error = result.message
-                        result.message.contains("Password is required") ->
-                            passwordLayout.error = result.message
-                        else -> passwordLayout.error = result.message
+            signInButton.isEnabled = false
+            lifecycleScope.launch {
+                when (val result = authManager.signIn(email, password)) {
+                    is AuthManager.AuthResult.Success -> {
+                        startActivity(Intent(this@SignInActivity, MainActivity::class.java))
+                        finish()
+                    }
+                    is AuthManager.AuthResult.Error -> {
+                        signInButton.isEnabled = true
+                        when {
+                            result.message.contains("Email", ignoreCase = true) ->
+                                emailLayout.error = result.message
+                            result.message.contains("Password", ignoreCase = true) ->
+                                passwordLayout.error = result.message
+                            else -> passwordLayout.error = result.message
+                        }
                     }
                 }
             }
