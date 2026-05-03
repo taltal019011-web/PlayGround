@@ -49,7 +49,17 @@ data class Comment(
             eventId = localEventId,
             authorId = localAuthorId,
             content = data["content"] as? String ?: "",
-            timestamp = (data["timestamp"] as? Long) ?: 0L
+            timestamp = readLong(data["timestamp"])
         )
+
+        private fun readLong(value: Any?): Long {
+            return when (value) {
+                is Long -> value
+                is Int -> value.toLong()
+                is Double -> value.toLong()
+                is Float -> value.toLong()
+                else -> 0L
+            }
+        }
     }
 }
