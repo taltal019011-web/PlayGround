@@ -292,6 +292,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun formatEventTime(timestamp: Long): String {
