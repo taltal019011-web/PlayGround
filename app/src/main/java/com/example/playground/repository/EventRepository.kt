@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.playground.data.AppDatabase
 import com.example.playground.data.Comment
 import com.example.playground.data.Event
+import com.example.playground.data.EventJoin
+import com.example.playground.data.EventRating
 import com.example.playground.data.User
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -15,9 +17,14 @@ class EventRepository(context: Context) {
     private val commentDao = db.commentDao()
     private val userDao = db.userDao()
 
+    private val eventJoinDao = db.eventJoinDao()
+    private val eventRatingDao = db.eventRatingDao()
+
     private val firestore = FirebaseFirestore.getInstance()
     private val eventsCollection = firestore.collection("events")
     private val commentsCollection = firestore.collection("comments")
+    private val joinsCollection = firestore.collection("event_joins")
+    private val ratingsCollection = firestore.collection("event_ratings")
 
     sealed class EventResult {
         data class Success(val eventId: Long) : EventResult()
@@ -157,6 +164,57 @@ class EventRepository(context: Context) {
         val authorUid = author?.firebaseUid ?: ""
         commentsCollection.document(comment.id.toString())
             .set(comment.toFirestoreMap(comment.eventId.toString(), authorUid))
+    }
+
+    fun joinEvent(eventId: Long, userId: Long) {
+        val join = EventJoin(eventId = eventId, userId = userId)
+        eventJoinDao.insert(join)
+        syncJoinToFirestore(join)
+    }
+
+    fun unjoinEvent(eventId: Long, userId: Long) {
+        eventJoinDao.delete(eventId, userId)
+        val user = userDao.findById(userId)
+        val event = eventDao.findById(eventId)
+        val host = event?.let { userDao.findById(it.hostId) }
+        val firestoreKey = "${user?.firebaseUid}_${event?.id}"
+        joinsCollection.document(firestoreKey).delete()
+    }
+
+    fun isJoined(eventId: Long, userId: Long): Boolean =
+        eventJoinDao.isJoined(eventId, userId)
+
+    fun getJoinCount(eventId: Long): Int =
+        eventJoinDao.getJoinCount(eventId)
+
+    fun rateEvent(eventId: Long, userId: Long, stars: Int) {
+        val rating = EventRating(eventId = eventId, userId = userId, stars = stars)
+        eventRatingDao.insert(rating)
+        syncRatingToFirestore(rating)
+    }
+
+    fun getUserRating(eventId: Long, userId: Long): Int? =
+        eventRatingDao.getRating(eventId, userId)
+
+    fun getAverageRating(eventId: Long): Float =
+        eventRatingDao.getAverageRating(eventId) ?: 0f
+
+    private fun syncJoinToFirestore(join: EventJoin) {
+        val user = userDao.findById(join.userId)
+        val event = eventDao.findById(join.eventId)
+        val host = event?.let { userDao.findById(it.hostId) }
+        val userUid = user?.firebaseUid ?: ""
+        val firestoreKey = "${userUid}_${join.eventId}"
+        joinsCollection.document(firestoreKey)
+            .set(join.toFirestoreMap(join.eventId.toString(), userUid))
+    }
+
+    private fun syncRatingToFirestore(rating: EventRating) {
+        val user = userDao.findById(rating.userId)
+        val userUid = user?.firebaseUid ?: ""
+        val firestoreKey = "${userUid}_${rating.eventId}"
+        ratingsCollection.document(firestoreKey)
+            .set(rating.toFirestoreMap(rating.eventId.toString(), userUid))
     }
 
     companion object {
