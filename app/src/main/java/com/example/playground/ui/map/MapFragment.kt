@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.example.playground.R
 import com.example.playground.auth.AuthManager
 import com.example.playground.data.Event
@@ -32,6 +33,7 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.launch
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
@@ -233,8 +235,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             closeDetails()
         }
 
-        allEvents = eventRepository.getAllEvents()
-        applyFilters()
+        lifecycleScope.launch {
+            allEvents = eventRepository.getAllEvents()
+            applyFilters()
+        }
         enableMyLocation()
     }
 
@@ -342,7 +346,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         updateRatingViews(rating)
-        refreshComments(event.id)
+        lifecycleScope.launch {
+            refreshComments(event.id)
+        }
     }
 
     private fun getHostDisplayName(event: Event): String {
@@ -355,13 +361,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun getParticipantCount(event: Event): Int {
-        val existing = participantCounts[event.id]
-        if (existing != null) return existing
-
-        val commentsCount = eventRepository.getCommentsForEvent(event.id).size
-        val initialCount = commentsCount.coerceAtLeast(1).coerceAtMost(event.maxPlayers)
-        participantCounts[event.id] = initialCount
-        return initialCount
+        return participantCounts[event.id] ?: 1
     }
 
     private fun joinSelectedEvent() {
@@ -411,7 +411,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         if (text.isNotBlank()) {
             eventRepository.postComment(event.id, user.id, text)
             commentInput.setText("")
-            refreshComments(event.id)
+            lifecycleScope.launch {
+                refreshComments(event.id)
+            }
         }
     }
 
@@ -512,7 +514,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }.sortedBy { it.second }
     }
 
-    private fun refreshComments(eventId: Long) {
+    private suspend fun refreshComments(eventId: Long) {
         val comments = eventRepository.getCommentsForEvent(eventId)
         val currentUser = authManager.getCurrentUser()
 

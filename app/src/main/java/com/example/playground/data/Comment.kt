@@ -41,11 +41,15 @@ data class Comment(
     )
 
     companion object {
-        fun fromFirestoreMap(data: Map<String, Any?>): Comment = Comment(
+        fun fromFirestoreMap(
+            data: Map<String, Any?>,
+            localEventId: Long,
+            localAuthorId: Long
+        ): Comment = Comment(
+            eventId = localEventId,
+            authorId = localAuthorId,
             content = data["content"] as? String ?: "",
-            timestamp = (data["timestamp"] as? Long) ?: 0L,
-            eventId = 0,
-            authorId = 0
+            timestamp = (data["timestamp"] as? Long) ?: 0L
         )
     }
 }

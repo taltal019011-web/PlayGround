@@ -21,6 +21,8 @@ import android.app.AlertDialog
 import android.net.Uri
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MyPostsFragment : Fragment() {
 
@@ -46,7 +48,13 @@ class MyPostsFragment : Fragment() {
 
     private fun loadEvents() {
         val user = authManager.getCurrentUser() ?: return
-        val myEvents = eventRepository.getAllEvents().filter { it.hostId == user.id }
+        lifecycleScope.launch {
+            loadEventsAsync(user.id)
+        }
+    }
+
+    private suspend fun loadEventsAsync(userId: Long) {
+        val myEvents = eventRepository.getAllEvents().filter { it.hostId == userId }
         if (myEvents.isEmpty()) {
             recyclerView.visibility = View.GONE
             emptyText.visibility = View.VISIBLE
