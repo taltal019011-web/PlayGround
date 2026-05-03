@@ -2,16 +2,17 @@ package com.example.playground.auth
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.database.sqlite.SQLiteConstraintException
 import com.example.playground.data.AppDatabase
 import com.example.playground.data.User
-import java.security.MessageDigest
-import java.security.SecureRandom
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.tasks.await
 
 class AuthManager(context: Context) {
 
     private val db = AppDatabase.getInstance(context)
     private val userDao = db.userDao()
+    private val firebaseAuth = FirebaseAuth.getInstance()
     private val prefs: SharedPreferences =
         context.getSharedPreferences("auth", Context.MODE_PRIVATE)
 
@@ -20,66 +21,65 @@ class AuthManager(context: Context) {
         data class Error(val message: String) : AuthResult()
     }
 
-    fun signUp(username: String, password: String): AuthResult {
-        if (username.isBlank()) return AuthResult.Error("Username is required")
+    suspend fun signUp(email: String, password: String): AuthResult {
+        if (email.isBlank()) return AuthResult.Error("Email is required")
         if (password.isEmpty()) return AuthResult.Error("Password is required")
-        if (userDao.findByUsername(username) != null) {
-            return AuthResult.Error("Username is already taken")
-        }
 
-        val salt = generateSalt()
-        val hash = hashPassword(password, salt)
-        val user = User(username = username, passwordHash = hash, salt = salt)
-        val id = try {
-            userDao.insertUser(user)
-        } catch (_: SQLiteConstraintException) {
-            return AuthResult.Error("Username is already taken")
-        }
-        val savedUser = user.copy(id = id)
+        return try {
+            val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+            val firebaseUser = result.user
+                ?: return AuthResult.Error("Sign up failed")
 
-        prefs.edit().putLong(KEY_USER_ID, id).apply()
-        return AuthResult.Success(savedUser)
+            val user = saveLocalUser(firebaseUser)
+            prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
+            firebaseAuth.signOut()
+            AuthResult.Success(user)
+        } catch (e: Exception) {
+            AuthResult.Error(e.message ?: "Sign up failed")
+        }
     }
 
-    fun signIn(username: String, password: String): AuthResult {
-        if (username.isBlank()) return AuthResult.Error("Username is required")
+    suspend fun signIn(email: String, password: String): AuthResult {
+        if (email.isBlank()) return AuthResult.Error("Email is required")
         if (password.isEmpty()) return AuthResult.Error("Password is required")
 
-        val user = userDao.findByUsername(username)
-            ?: return AuthResult.Error("Invalid username or password")
+        return try {
+            val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            val firebaseUser = result.user
+                ?: return AuthResult.Error("Sign in failed")
 
-        val hash = hashPassword(password, user.salt)
-        if (hash != user.passwordHash) {
-            return AuthResult.Error("Invalid username or password")
+            val user = saveLocalUser(firebaseUser)
+            prefs.edit().putString(KEY_FIREBASE_UID, firebaseUser.uid).apply()
+            firebaseAuth.signOut()
+            AuthResult.Success(user)
+        } catch (e: Exception) {
+            AuthResult.Error(e.message ?: "Sign in failed")
         }
-
-        prefs.edit().putLong(KEY_USER_ID, user.id).apply()
-        return AuthResult.Success(user)
     }
 
     fun signOut() {
-        prefs.edit().remove(KEY_USER_ID).apply()
+        prefs.edit().remove(KEY_FIREBASE_UID).apply()
     }
 
     fun getCurrentUser(): User? {
-        val userId = prefs.getLong(KEY_USER_ID, -1L)
-        if (userId == -1L) return null
-        return userDao.findById(userId)
+        val uid = prefs.getString(KEY_FIREBASE_UID, null) ?: return null
+        return userDao.findByFirebaseUid(uid)
+    }
+
+    private fun saveLocalUser(firebaseUser: FirebaseUser): User {
+        val existing = userDao.findByFirebaseUid(firebaseUser.uid)
+        if (existing != null) return existing
+
+        val user = User(
+            firebaseUid = firebaseUser.uid,
+            email = firebaseUser.email ?: "",
+            displayName = firebaseUser.displayName ?: ""
+        )
+        val id = userDao.insertUser(user)
+        return user.copy(id = id)
     }
 
     companion object {
-        private const val KEY_USER_ID = "signed_in_user_id"
-
-        fun generateSalt(): String {
-            val bytes = ByteArray(16)
-            SecureRandom().nextBytes(bytes)
-            return bytes.joinToString("") { "%02x".format(it) }
-        }
-
-        fun hashPassword(password: String, salt: String): String {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val bytes = digest.digest("$salt$password".toByteArray())
-            return bytes.joinToString("") { "%02x".format(it) }
-        }
+        private const val KEY_FIREBASE_UID = "signed_in_firebase_uid"
     }
 }
