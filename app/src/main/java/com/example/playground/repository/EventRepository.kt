@@ -187,6 +187,24 @@ class EventRepository(context: Context) {
     fun getJoinCount(eventId: Long): Int =
         eventJoinDao.getJoinCount(eventId)
 
+    suspend fun fetchJoinsForEvent(eventId: Long) {
+        try {
+            val snapshot = joinsCollection
+                .whereEqualTo("eventFirestoreId", eventId.toString())
+                .get()
+                .await()
+
+            eventJoinDao.deleteByEvent(eventId)
+            for (doc in snapshot.documents) {
+                val data = doc.data ?: continue
+                val userUid = data["userFirebaseUid"] as? String ?: continue
+                val localUser = resolveOrCreateUser(userUid, data)
+                eventJoinDao.insert(EventJoin(eventId = eventId, userId = localUser.id))
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     fun rateEvent(eventId: Long, userId: Long, stars: Int) {
         val rating = EventRating(eventId = eventId, userId = userId, stars = stars)
         eventRatingDao.insert(rating)
@@ -198,6 +216,25 @@ class EventRepository(context: Context) {
 
     fun getAverageRating(eventId: Long): Float =
         eventRatingDao.getAverageRating(eventId) ?: 0f
+
+    suspend fun fetchRatingsForEvent(eventId: Long) {
+        try {
+            val snapshot = ratingsCollection
+                .whereEqualTo("eventFirestoreId", eventId.toString())
+                .get()
+                .await()
+
+            eventRatingDao.deleteByEvent(eventId)
+            for (doc in snapshot.documents) {
+                val data = doc.data ?: continue
+                val userUid = data["userFirebaseUid"] as? String ?: continue
+                val stars = (data["stars"] as? Long)?.toInt() ?: continue
+                val localUser = resolveOrCreateUser(userUid, data)
+                eventRatingDao.insert(EventRating(eventId = eventId, userId = localUser.id, stars = stars))
+            }
+        } catch (_: Exception) {
+        }
+    }
 
     private fun syncJoinToFirestore(join: EventJoin) {
         val user = userDao.findById(join.userId)

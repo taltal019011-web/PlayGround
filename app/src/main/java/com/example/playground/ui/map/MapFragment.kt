@@ -289,7 +289,19 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private fun showDetails(event: Event) {
         selectedEvent = event
         detailsCard.visibility = View.VISIBLE
+        renderDetails(event)
 
+        lifecycleScope.launch {
+            eventRepository.fetchJoinsForEvent(event.id)
+            eventRepository.fetchRatingsForEvent(event.id)
+            refreshComments(event.id)
+            if (selectedEvent?.id == event.id) {
+                renderDetails(event)
+            }
+        }
+    }
+
+    private fun renderDetails(event: Event) {
         val currentUser = authManager.getCurrentUser()
         val participantCount = eventRepository.getJoinCount(event.id)
         val isJoined = currentUser != null && eventRepository.isJoined(event.id, currentUser.id)
@@ -345,9 +357,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         updateRatingViews(displayRating)
-        lifecycleScope.launch {
-            refreshComments(event.id)
-        }
     }
 
     private fun getHostDisplayName(event: Event): String {
@@ -368,12 +377,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         } else {
             val joinCount = eventRepository.getJoinCount(event.id)
             if (joinCount >= event.maxPlayers) {
-                showDetails(event)
+                renderDetails(event)
                 return
             }
             eventRepository.joinEvent(event.id, currentUser.id)
         }
-        showDetails(event)
+        renderDetails(event)
     }
 
     private fun rateSelectedEvent(stars: Int) {
@@ -381,7 +390,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         val currentUser = authManager.getCurrentUser() ?: return
         val clamped = stars.coerceIn(1, 5)
         eventRepository.rateEvent(event.id, currentUser.id, clamped)
-        updateRatingViews(clamped)
+        renderDetails(event)
     }
 
     private fun updateRatingViews(rating: Int) {
