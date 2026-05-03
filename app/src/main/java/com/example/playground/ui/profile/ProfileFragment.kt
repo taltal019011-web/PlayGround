@@ -10,7 +10,6 @@ import androidx.fragment.app.Fragment
 import com.example.playground.R
 import com.example.playground.SignInActivity
 import com.example.playground.auth.AuthManager
-import com.example.playground.data.AppDatabase
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 
@@ -29,8 +28,6 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         authManager = AuthManager(requireContext())
-        val db = AppDatabase.getInstance(requireContext())
-        val userDao = db.userDao()
 
         var user = authManager.getCurrentUser()
 
@@ -50,7 +47,7 @@ class ProfileFragment : Fragment() {
                 val newName = nameInput.text.toString().trim()
                 if (newName.isNotEmpty() && user != null) {
                     user = user!!.copy(displayName = newName)
-                    userDao.updateUser(user!!)
+                    authManager.updateUser(user!!)
                     nameInput.isEnabled = false
                     editProfileButton.text = "Edit Profile"
                     isEditing = false

@@ -6,6 +6,7 @@ import com.example.playground.data.AppDatabase
 import com.example.playground.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
 class AuthManager(context: Context) {
@@ -13,6 +14,8 @@ class AuthManager(context: Context) {
     private val db = AppDatabase.getInstance(context)
     private val userDao = db.userDao()
     private val firebaseAuth = FirebaseAuth.getInstance()
+    private val firestore = FirebaseFirestore.getInstance()
+    private val usersCollection = firestore.collection("users")
     private val prefs: SharedPreferences =
         context.getSharedPreferences("auth", Context.MODE_PRIVATE)
 
@@ -66,9 +69,17 @@ class AuthManager(context: Context) {
         return userDao.findByFirebaseUid(uid)
     }
 
-    private fun saveLocalUser(firebaseUser: FirebaseUser): User {
+    fun updateUser(user: User) {
+        userDao.updateUser(user)
+        syncUserToFirestore(user)
+    }
+
+    private suspend fun saveLocalUser(firebaseUser: FirebaseUser): User {
         val existing = userDao.findByFirebaseUid(firebaseUser.uid)
-        if (existing != null) return existing
+        if (existing != null) {
+            syncUserToFirestore(existing)
+            return existing
+        }
 
         val user = User(
             firebaseUid = firebaseUser.uid,
@@ -76,7 +87,13 @@ class AuthManager(context: Context) {
             displayName = firebaseUser.displayName ?: ""
         )
         val id = userDao.insertUser(user)
-        return user.copy(id = id)
+        val saved = user.copy(id = id)
+        syncUserToFirestore(saved)
+        return saved
+    }
+
+    private fun syncUserToFirestore(user: User) {
+        usersCollection.document(user.firebaseUid).set(user.toFirestoreMap())
     }
 
     companion object {
