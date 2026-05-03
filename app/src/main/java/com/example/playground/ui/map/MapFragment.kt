@@ -90,10 +90,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var selectedEvent: Event? = null
     private var activeExpanded = true
 
-    private val joinedEventIds = mutableSetOf<Long>()
-    private val participantCounts = mutableMapOf<Long, Int>()
-    private val eventRatings = mutableMapOf<Long, Int>()
-
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private val DEFAULT_LOCATION = LatLng(32.0853, 34.7818)
@@ -294,9 +290,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         selectedEvent = event
         detailsCard.visibility = View.VISIBLE
 
-        val participantCount = getParticipantCount(event)
-        val isJoined = joinedEventIds.contains(event.id)
-        val rating = eventRatings[event.id] ?: 4
+        val currentUser = authManager.getCurrentUser()
+        val participantCount = eventRepository.getJoinCount(event.id)
+        val isJoined = currentUser != null && eventRepository.isJoined(event.id, currentUser.id)
+        val userRating = currentUser?.let { eventRepository.getUserRating(event.id, it.id) }
+        val avgRating = eventRepository.getAverageRating(event.id)
+        val displayRating = userRating ?: avgRating.toInt().coerceAtLeast(1)
 
         hostAvatarText.text = getSportEmoji(event.sport)
         hostNameText.text = getHostDisplayName(event)
@@ -345,7 +344,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             }
         }
 
-        updateRatingViews(rating)
+        updateRatingViews(displayRating)
         lifecycleScope.launch {
             refreshComments(event.id)
         }
@@ -360,35 +359,29 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    private fun getParticipantCount(event: Event): Int {
-        return participantCounts[event.id] ?: 1
-    }
-
     private fun joinSelectedEvent() {
         val event = selectedEvent ?: return
-        val currentCount = getParticipantCount(event)
+        val currentUser = authManager.getCurrentUser() ?: return
 
-        if (joinedEventIds.contains(event.id)) {
-            joinedEventIds.remove(event.id)
-            participantCounts[event.id] = (currentCount - 1).coerceAtLeast(0)
-            showDetails(event)
-            return
+        if (eventRepository.isJoined(event.id, currentUser.id)) {
+            eventRepository.unjoinEvent(event.id, currentUser.id)
+        } else {
+            val joinCount = eventRepository.getJoinCount(event.id)
+            if (joinCount >= event.maxPlayers) {
+                showDetails(event)
+                return
+            }
+            eventRepository.joinEvent(event.id, currentUser.id)
         }
-
-        if (currentCount >= event.maxPlayers) {
-            showDetails(event)
-            return
-        }
-
-        joinedEventIds.add(event.id)
-        participantCounts[event.id] = currentCount + 1
         showDetails(event)
     }
 
     private fun rateSelectedEvent(stars: Int) {
         val event = selectedEvent ?: return
-        eventRatings[event.id] = stars.coerceIn(1, 5)
-        updateRatingViews(stars.coerceIn(1, 5))
+        val currentUser = authManager.getCurrentUser() ?: return
+        val clamped = stars.coerceIn(1, 5)
+        eventRepository.rateEvent(event.id, currentUser.id, clamped)
+        updateRatingViews(clamped)
     }
 
     private fun updateRatingViews(rating: Int) {
