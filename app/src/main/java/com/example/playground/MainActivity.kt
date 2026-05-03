@@ -8,11 +8,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.example.playground.auth.AuthManager
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.example.playground.ui.map.MapFragment
 import com.example.playground.ui.home.CreateEventFragment
+import com.example.playground.ui.map.MapFragment
 import com.example.playground.ui.myposts.MyPostsFragment
 import com.example.playground.ui.profile.ProfileFragment
+import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
 
@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_map -> replaceFragment(MapFragment())
@@ -51,6 +52,7 @@ class MainActivity : AppCompatActivity() {
 
         if (savedInstanceState == null) {
             replaceFragment(MapFragment())
+            bottomNav.selectedItemId = R.id.nav_map
         }
     }
 

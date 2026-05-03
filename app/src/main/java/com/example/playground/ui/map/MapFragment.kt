@@ -1,18 +1,30 @@
 package com.example.playground.ui.map
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.location.Location
+import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.example.playground.R
 import com.example.playground.auth.AuthManager
 import com.example.playground.data.Event
+import com.example.playground.data.Venue
+import com.example.playground.data.Venues
 import com.example.playground.repository.EventRepository
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -27,25 +39,30 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var authManager: AuthManager
     private lateinit var eventRepository: EventRepository
-    private var googleMap: GoogleMap? = null
 
-    // Search & filter
+    private var googleMap: GoogleMap? = null
+    private var userLocation: LatLng? = null
+
     private lateinit var searchInput: TextInputEditText
+
     private lateinit var chipAllSports: Chip
     private lateinit var chipBasketball: Chip
     private lateinit var chipFootball: Chip
     private lateinit var chipTennis: Chip
     private lateinit var chipVolleyball: Chip
-    private var selectedSport: String = "All"
 
-    // Active games card
     private lateinit var activeGamesCard: View
     private lateinit var activeGamesCountText: TextView
     private lateinit var closeActiveGamesButton: ImageButton
+    private lateinit var toggleActiveButton: ImageButton
+    private lateinit var activeContent: View
+    private lateinit var nearby1: TextView
+    private lateinit var nearby2: TextView
+    private lateinit var nearby3: TextView
 
-    // Details card
     private lateinit var detailsCard: View
     private lateinit var closeDetailsButton: ImageButton
+    private lateinit var hostAvatarText: TextView
     private lateinit var hostNameText: TextView
     private lateinit var postedAgoText: TextView
     private lateinit var sportChipText: TextView
@@ -54,20 +71,40 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var descriptionText: TextView
     private lateinit var locationText: TextView
     private lateinit var coordinatesText: TextView
+    private lateinit var ratingValueText: TextView
+    private lateinit var star1: TextView
+    private lateinit var star2: TextView
+    private lateinit var star3: TextView
+    private lateinit var star4: TextView
+    private lateinit var star5: TextView
     private lateinit var commentsHeaderText: TextView
     private lateinit var commentListContainer: LinearLayout
     private lateinit var commentInput: TextInputEditText
     private lateinit var addCommentButton: MaterialButton
     private lateinit var imComingButton: MaterialButton
-
-    private lateinit var eventImageView: android.widget.ImageView
+    private lateinit var eventImageView: ImageView  // ADDED
 
     private var allEvents: List<Event> = emptyList()
+    private var selectedSport: String = "All"
     private var selectedEvent: Event? = null
+    private var activeExpanded = true
+
+    private val joinedEventIds = mutableSetOf<Long>()
+    private val participantCounts = mutableMapOf<Long, Int>()
+    private val eventRatings = mutableMapOf<Long, Int>()
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private val DEFAULT_LOCATION = LatLng(32.0853, 34.7818)
+    }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? = inflater.inflate(R.layout.fragment_map, container, false)
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return inflater.inflate(R.layout.fragment_map, container, false)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -75,7 +112,16 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         authManager = AuthManager(requireContext())
         eventRepository = EventRepository.getInstance(requireContext())
 
+        bindViews(view)
+        setupActions()
+
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as? SupportMapFragment
+        mapFragment?.getMapAsync(this)
+    }
+
+    private fun bindViews(view: View) {
         searchInput = view.findViewById(R.id.searchInput)
+
         chipAllSports = view.findViewById(R.id.chipAllSports)
         chipBasketball = view.findViewById(R.id.chipBasketball)
         chipFootball = view.findViewById(R.id.chipFootball)
@@ -85,9 +131,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         activeGamesCard = view.findViewById(R.id.activeGamesCard)
         activeGamesCountText = view.findViewById(R.id.activeGamesCountText)
         closeActiveGamesButton = view.findViewById(R.id.closeActiveGamesButton)
+        toggleActiveButton = view.findViewById(R.id.toggleActiveButton)
+        activeContent = view.findViewById(R.id.activeContent)
+        nearby1 = view.findViewById(R.id.nearby1)
+        nearby2 = view.findViewById(R.id.nearby2)
+        nearby3 = view.findViewById(R.id.nearby3)
 
         detailsCard = view.findViewById(R.id.detailsCard)
         closeDetailsButton = view.findViewById(R.id.closeDetailsButton)
+        hostAvatarText = view.findViewById(R.id.hostAvatarText)
         hostNameText = view.findViewById(R.id.hostNameText)
         postedAgoText = view.findViewById(R.id.postedAgoText)
         sportChipText = view.findViewById(R.id.sportChipText)
@@ -96,52 +148,101 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         descriptionText = view.findViewById(R.id.descriptionText)
         locationText = view.findViewById(R.id.locationText)
         coordinatesText = view.findViewById(R.id.coordinatesText)
+        ratingValueText = view.findViewById(R.id.ratingValueText)
+        star1 = view.findViewById(R.id.star1)
+        star2 = view.findViewById(R.id.star2)
+        star3 = view.findViewById(R.id.star3)
+        star4 = view.findViewById(R.id.star4)
+        star5 = view.findViewById(R.id.star5)
         commentsHeaderText = view.findViewById(R.id.commentsHeaderText)
         commentListContainer = view.findViewById(R.id.commentListContainer)
         commentInput = view.findViewById(R.id.commentInput)
         addCommentButton = view.findViewById(R.id.addCommentButton)
         imComingButton = view.findViewById(R.id.imComingButton)
-        eventImageView = view.findViewById(R.id.eventImageView)
+        eventImageView = view.findViewById(R.id.eventImageView)  // ADDED
+    }
 
-        closeActiveGamesButton.setOnClickListener { activeGamesCard.visibility = View.GONE }
-        closeDetailsButton.setOnClickListener { detailsCard.visibility = View.GONE }
+    private fun setupActions() {
+        closeActiveGamesButton.setOnClickListener {
+            activeGamesCard.visibility = View.GONE
+        }
+
+        toggleActiveButton.setOnClickListener {
+            activeExpanded = !activeExpanded
+            activeContent.visibility = if (activeExpanded) View.VISIBLE else View.GONE
+            toggleActiveButton.rotation = if (activeExpanded) 180f else 0f
+        }
+
+        closeDetailsButton.setOnClickListener {
+            closeDetails()
+        }
 
         imComingButton.setOnClickListener {
-            // No join table yet — just update button state visually
-            imComingButton.text = "Already Joined"
-            imComingButton.isEnabled = false
+            joinSelectedEvent()
         }
 
         addCommentButton.setOnClickListener {
-            val event = selectedEvent ?: return@setOnClickListener
-            val user = authManager.getCurrentUser() ?: return@setOnClickListener
-            val text = commentInput.text.toString().trim()
-            if (text.isNotBlank()) {
-                eventRepository.postComment(event.id, user.id, text)
-                commentInput.setText("")
-                refreshComments(event.id)
-            }
+            addCommentToSelectedEvent()
         }
 
-        setupChips()
+        star1.setOnClickListener { rateSelectedEvent(1) }
+        star2.setOnClickListener { rateSelectedEvent(2) }
+        star3.setOnClickListener { rateSelectedEvent(3) }
+        star4.setOnClickListener { rateSelectedEvent(4) }
+        star5.setOnClickListener { rateSelectedEvent(5) }
+
+        chipAllSports.setOnClickListener { setSport("All") }
+        chipBasketball.setOnClickListener { setSport("Basketball") }
+        chipFootball.setOnClickListener { setSport("Football") }
+        chipTennis.setOnClickListener { setSport("Tennis") }
+        chipVolleyball.setOnClickListener { setSport("Volleyball") }
 
         searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                applyFilters(); true
-            } else false
+                applyFilters()
+                true
+            } else {
+                false
+            }
         }
 
-        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
-        mapFragment.getMapAsync(this)
+        updateChipSelection()
     }
 
-    private fun setupChips() {
-        chipAllSports.setOnClickListener { selectedSport = "All"; updateChipSelection(); applyFilters() }
-        chipBasketball.setOnClickListener { selectedSport = "Basketball"; updateChipSelection(); applyFilters() }
-        chipFootball.setOnClickListener { selectedSport = "Football"; updateChipSelection(); applyFilters() }
-        chipTennis.setOnClickListener { selectedSport = "Tennis"; updateChipSelection(); applyFilters() }
-        chipVolleyball.setOnClickListener { selectedSport = "Volleyball"; updateChipSelection(); applyFilters() }
+    override fun onMapReady(map: GoogleMap) {
+        googleMap = map
+
+        map.uiSettings.isZoomControlsEnabled = true
+        map.uiSettings.isMyLocationButtonEnabled = true
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, 12.5f))
+
+        map.setOnMarkerClickListener { marker ->
+            val event = marker.tag as? Event
+            if (event != null) {
+                showDetails(event)
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(event.latitude, event.longitude),
+                        13.5f
+                    )
+                )
+            }
+            true
+        }
+
+        map.setOnMapClickListener {
+            closeDetails()
+        }
+
+        allEvents = eventRepository.getAllEvents()
+        applyFilters()
+        enableMyLocation()
+    }
+
+    private fun setSport(sport: String) {
+        selectedSport = sport
         updateChipSelection()
+        applyFilters()
     }
 
     private fun updateChipSelection() {
@@ -152,79 +253,62 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         chipVolleyball.isChecked = selectedSport == "Volleyball"
     }
 
-    override fun onMapReady(map: GoogleMap) {
-        googleMap = map
-        val telAviv = LatLng(32.0853, 34.7818)
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(telAviv, 12.5f))
-
-        map.setOnMarkerClickListener { marker ->
-            val event = marker.tag as? Event
-            if (event != null) {
-                showDetails(event)
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(event.latitude, event.longitude), 13.5f))
-            }
-            true
-        }
-
-        map.setOnMapClickListener { detailsCard.visibility = View.GONE }
-
-        allEvents = eventRepository.getAllEvents()
-        showMarkers(allEvents)
-        updateActiveGamesCard(allEvents)
-    }
-
     private fun applyFilters() {
         val query = searchInput.text?.toString().orEmpty().trim().lowercase()
+
         val filtered = allEvents.filter { event ->
+            val hasCoordinates = event.latitude != 0.0 && event.longitude != 0.0
             val sportMatches = selectedSport == "All" || event.sport.equals(selectedSport, ignoreCase = true)
             val textMatches = query.isEmpty() ||
                     event.title.lowercase().contains(query) ||
                     event.sport.lowercase().contains(query) ||
                     event.locationLabel.lowercase().contains(query)
-            sportMatches && textMatches
+
+            hasCoordinates && sportMatches && textMatches
         }
+
         showMarkers(filtered)
-        updateActiveGamesCard(filtered)
-        val map = googleMap ?: return
-        if (filtered.isNotEmpty()) {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(filtered.first().latitude, filtered.first().longitude), 13f))
-        } else {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(32.0853, 34.7818), 12.5f))
-        }
+        activeGamesCountText.text = "${filtered.size} games near you"
     }
 
     private fun showMarkers(events: List<Event>) {
         val map = googleMap ?: return
+
         map.clear()
-        detailsCard.visibility = View.GONE
+
         for (event in events) {
             val marker = map.addMarker(
-                MarkerOptions().position(LatLng(event.latitude, event.longitude)).title(event.title)
+                MarkerOptions()
+                    .position(LatLng(event.latitude, event.longitude))
+                    .title(event.title)
             )
+
             marker?.tag = event
         }
-    }
-
-    private fun updateActiveGamesCard(events: List<Event>) {
-        activeGamesCountText.text = "${events.size} games near you"
     }
 
     private fun showDetails(event: Event) {
         selectedEvent = event
         detailsCard.visibility = View.VISIBLE
 
-        hostNameText.text = "Host #${event.hostId}"
-        postedAgoText.text = formatEventTime(event.startTime)
+        val participantCount = getParticipantCount(event)
+        val isJoined = joinedEventIds.contains(event.id)
+        val rating = eventRatings[event.id] ?: 4
+
+        hostAvatarText.text = getSportEmoji(event.sport)
+        hostNameText.text = getHostDisplayName(event)
+        postedAgoText.text = formatEventTime(event.startTime)  // CHANGED
         sportChipText.text = event.sport
-        joiningCountText.text = "Max ${event.maxPlayers} players"
+        joiningCountText.text = "$participantCount / ${event.maxPlayers} joining"
         titleText.text = event.title
         descriptionText.text = event.description ?: ""
-        locationText.text = event.locationLabel
-        coordinatesText.text = "%.3f, %.3f".format(event.latitude, event.longitude)
+        locationText.text = "📍 ${event.locationLabel}"
+        coordinatesText.text = "%.5f, %.5f".format(event.latitude, event.longitude)
 
+        // ADDED: load event image
         if (event.imageUri != null) {
             try {
-                eventImageView.setImageURI(android.net.Uri.parse(event.imageUri))
+                eventImageView.setImageURI(Uri.parse(event.imageUri))
                 eventImageView.visibility = View.VISIBLE
             } catch (e: Exception) {
                 eventImageView.visibility = View.GONE
@@ -233,55 +317,260 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             eventImageView.visibility = View.GONE
         }
 
-        imComingButton.text = "I'm Coming!"
-        imComingButton.isEnabled = true
+        when {
+            isJoined -> {
+                imComingButton.text = "Cancel Join"
+                imComingButton.isEnabled = true
+                imComingButton.setBackgroundColor(0xFFE0E0E0.toInt())
+                imComingButton.setTextColor(0xFF444444.toInt())
+            }
+            participantCount >= event.maxPlayers -> {
+                imComingButton.text = "Game Full"
+                imComingButton.isEnabled = false
+                imComingButton.setBackgroundColor(0xFFCCCCCC.toInt())
+                imComingButton.setTextColor(0xFF888888.toInt())
+            }
+            else -> {
+                imComingButton.text = "I'm Coming!"
+                imComingButton.isEnabled = true
+                imComingButton.setBackgroundColor(0xFF2A5BD7.toInt())
+                imComingButton.setTextColor(0xFFFFFFFF.toInt())
+            }
+        }
 
+        updateRatingViews(rating)
         refreshComments(event.id)
     }
+
+    private fun getHostDisplayName(event: Event): String {
+        val currentUser = authManager.getCurrentUser()
+        return if (currentUser != null && currentUser.id == event.hostId) {
+            currentUser.username
+        } else {
+            "Host #${event.hostId}"
+        }
+    }
+
+    private fun getParticipantCount(event: Event): Int {
+        val existing = participantCounts[event.id]
+        if (existing != null) return existing
+
+        val commentsCount = eventRepository.getCommentsForEvent(event.id).size
+        val initialCount = commentsCount.coerceAtLeast(1).coerceAtMost(event.maxPlayers)
+        participantCounts[event.id] = initialCount
+        return initialCount
+    }
+
+    private fun joinSelectedEvent() {
+        val event = selectedEvent ?: return
+        val currentCount = getParticipantCount(event)
+
+        if (joinedEventIds.contains(event.id)) {
+            joinedEventIds.remove(event.id)
+            participantCounts[event.id] = (currentCount - 1).coerceAtLeast(0)
+            showDetails(event)
+            return
+        }
+
+        if (currentCount >= event.maxPlayers) {
+            showDetails(event)
+            return
+        }
+
+        joinedEventIds.add(event.id)
+        participantCounts[event.id] = currentCount + 1
+        showDetails(event)
+    }
+
+    private fun rateSelectedEvent(stars: Int) {
+        val event = selectedEvent ?: return
+        eventRatings[event.id] = stars.coerceIn(1, 5)
+        updateRatingViews(stars.coerceIn(1, 5))
+    }
+
+    private fun updateRatingViews(rating: Int) {
+        val stars = listOf(star1, star2, star3, star4, star5)
+
+        stars.forEachIndexed { index, textView ->
+            val selected = index < rating
+            textView.text = if (selected) "★" else "☆"
+            textView.alpha = if (selected) 1f else 0.45f
+        }
+
+        ratingValueText.text = "%.1f".format(rating.toFloat())
+    }
+
+    private fun addCommentToSelectedEvent() {
+        val event = selectedEvent ?: return
+        val user = authManager.getCurrentUser() ?: return
+        val text = commentInput.text.toString().trim()
+
+        if (text.isNotBlank()) {
+            eventRepository.postComment(event.id, user.id, text)
+            commentInput.setText("")
+            refreshComments(event.id)
+        }
+    }
+
+    private fun closeDetails() {
+        detailsCard.visibility = View.GONE
+        selectedEvent = null
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun enableMyLocation() {
+        val map = googleMap ?: return
+
+        val hasPermission = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE
+            )
+            showNearbyVenues(DEFAULT_LOCATION)
+            return
+        }
+
+        map.isMyLocationEnabled = true
+
+        val client = LocationServices.getFusedLocationProviderClient(requireActivity())
+        client.lastLocation.addOnSuccessListener { location ->
+            val current = if (location != null) {
+                LatLng(location.latitude, location.longitude)
+            } else {
+                DEFAULT_LOCATION
+            }
+
+            userLocation = current
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 14f))
+            showNearbyVenues(current)
+        }.addOnFailureListener {
+            userLocation = DEFAULT_LOCATION
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, 12.5f))
+            showNearbyVenues(DEFAULT_LOCATION)
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (
+            requestCode == LOCATION_PERMISSION_REQUEST_CODE &&
+            grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        ) {
+            enableMyLocation()
+        } else if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            userLocation = DEFAULT_LOCATION
+            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(DEFAULT_LOCATION, 12.5f))
+            showNearbyVenues(DEFAULT_LOCATION)
+        }
+    }
+
+    private fun showNearbyVenues(currentLocation: LatLng) {
+        val nearest = getNearbyVenues(currentLocation).take(3)
+
+        nearby1.text = formatVenueRow(nearest.getOrNull(0))
+        nearby2.text = formatVenueRow(nearest.getOrNull(1))
+        nearby3.text = formatVenueRow(nearest.getOrNull(2))
+    }
+
+    private fun formatVenueRow(item: Pair<Venue, Float>?): String {
+        if (item == null) return "-"
+
+        val venue = item.first
+        val km = item.second / 1000
+
+        return "${venue.emoji} ${venue.name} • %.1f km".format(km)
+    }
+
+    private fun getNearbyVenues(currentLocation: LatLng): List<Pair<Venue, Float>> {
+        return Venues.all.map { venue ->
+            val result = FloatArray(1)
+
+            Location.distanceBetween(
+                currentLocation.latitude,
+                currentLocation.longitude,
+                venue.latitude,
+                venue.longitude,
+                result
+            )
+
+            venue to result[0]
+        }.sortedBy { it.second }
+    }
+
     private fun refreshComments(eventId: Long) {
         val comments = eventRepository.getCommentsForEvent(eventId)
+        val currentUser = authManager.getCurrentUser()
+
         commentsHeaderText.text = "Comments (${comments.size})"
         commentListContainer.removeAllViews()
 
         for (comment in comments) {
+            val authorName = if (currentUser != null && currentUser.id == comment.authorId) {
+                currentUser.username
+            } else {
+                "User ${comment.authorId}"
+            }
+
             val row = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 12, 0, 0) }
+                ).apply {
+                    setMargins(0, 14, 0, 0)
+                }
             }
 
-            // Avatar
             val avatar = TextView(requireContext()).apply {
                 text = "👤"
-                textSize = 18f
-                layoutParams = LinearLayout.LayoutParams(40.dpToPx(), 40.dpToPx())
-                gravity = android.view.Gravity.CENTER
+                textSize = 22f
+                gravity = Gravity.CENTER
+                setBackgroundColor(0xFFE8F0FE.toInt())
+                layoutParams = LinearLayout.LayoutParams(44.dpToPx(), 44.dpToPx())
             }
 
-            // Bubble
             val bubble = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(0xFFF3F3F3.toInt())
-                setPadding(12.dpToPx(), 10.dpToPx(), 12.dpToPx(), 10.dpToPx())
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    .apply { setMargins(10.dpToPx(), 0, 0, 0) }
+                setBackgroundColor(0xFFF5F5F5.toInt())
+                setPadding(14.dpToPx(), 12.dpToPx(), 14.dpToPx(), 12.dpToPx())
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    setMargins(12.dpToPx(), 0, 0, 0)
+                }
             }
 
             val authorView = TextView(requireContext()).apply {
-                text = "User #${comment.authorId}"
+                text = authorName
                 textSize = 15f
-                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFF444444.toInt())
+                setTypeface(null, Typeface.BOLD)
             }
 
             val bodyView = TextView(requireContext()).apply {
                 text = comment.content
-                textSize = 14f
+                textSize = 15f
+                setTextColor(0xFF555555.toInt())
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 4.dpToPx(), 0, 0) }
+                ).apply {
+                    setMargins(0, 5.dpToPx(), 0, 0)
+                }
             }
 
             bubble.addView(authorView)
@@ -292,9 +581,21 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    private fun getSportEmoji(sport: String): String {
+        return when (sport.lowercase()) {
+            "basketball" -> "🏀"
+            "football" -> "⚽"
+            "tennis" -> "🎾"
+            "volleyball" -> "🏐"
+            else -> "👤"
+        }
+    }
 
-    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
+    private fun Int.dpToPx(): Int {
+        return (this * resources.displayMetrics.density).toInt()
+    }
 
+    // CHANGED: shows future event time instead of negative "ago"
     private fun formatEventTime(timestamp: Long): String {
         val diff = timestamp - System.currentTimeMillis()
         val minutes = diff / 60_000
