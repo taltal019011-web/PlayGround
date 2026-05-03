@@ -15,10 +15,14 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["hostId"])]
+    indices = [
+        Index(value = ["hostId"]),
+        Index(value = ["firestoreId"], unique = true)
+    ]
 )
 data class Event(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val firestoreId: String = "",
     val hostId: Long,
     val sport: String,
     val title: String,
@@ -33,6 +37,7 @@ data class Event(
     val published: Boolean = true
 ) {
     fun toFirestoreMap(hostFirebaseUid: String): Map<String, Any?> = mapOf(
+        "firestoreId" to firestoreId,
         "hostFirebaseUid" to hostFirebaseUid,
         "sport" to sport,
         "title" to title,
@@ -48,19 +53,44 @@ data class Event(
     )
 
     companion object {
-        fun fromFirestoreMap(data: Map<String, Any?>, localHostId: Long): Event = Event(
+        fun fromFirestoreMap(
+            firestoreId: String,
+            data: Map<String, Any?>,
+            localHostId: Long
+        ): Event = Event(
+            firestoreId = firestoreId,
             hostId = localHostId,
             sport = data["sport"] as? String ?: "",
             title = data["title"] as? String ?: "",
             description = data["description"] as? String,
-            startTime = (data["startTime"] as? Long) ?: 0L,
-            maxPlayers = (data["maxPlayers"] as? Long)?.toInt() ?: 0,
+            startTime = readLong(data["startTime"]),
+            maxPlayers = readLong(data["maxPlayers"]).toInt(),
             imageUri = data["imageUri"] as? String,
-            latitude = (data["latitude"] as? Double) ?: 0.0,
-            longitude = (data["longitude"] as? Double) ?: 0.0,
+            latitude = readDouble(data["latitude"]),
+            longitude = readDouble(data["longitude"]),
             locationLabel = data["locationLabel"] as? String ?: "",
             address = data["address"] as? String,
-            published = (data["published"] as? Boolean) ?: true
+            published = data["published"] as? Boolean ?: true
         )
+
+        private fun readLong(value: Any?): Long {
+            return when (value) {
+                is Long -> value
+                is Int -> value.toLong()
+                is Double -> value.toLong()
+                is Float -> value.toLong()
+                else -> 0L
+            }
+        }
+
+        private fun readDouble(value: Any?): Double {
+            return when (value) {
+                is Double -> value
+                is Float -> value.toDouble()
+                is Long -> value.toDouble()
+                is Int -> value.toDouble()
+                else -> 0.0
+            }
+        }
     }
 }

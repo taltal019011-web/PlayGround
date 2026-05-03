@@ -12,11 +12,11 @@ import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 
 class EventRepository(context: Context) {
+
     private val db = AppDatabase.getInstance(context)
     private val eventDao = db.eventDao()
     private val commentDao = db.commentDao()
     private val userDao = db.userDao()
-
     private val eventJoinDao = db.eventJoinDao()
     private val eventRatingDao = db.eventRatingDao()
 
@@ -38,14 +38,23 @@ class EventRepository(context: Context) {
         if (event.startTime <= System.currentTimeMillis()) return EventResult.Error("Start time must be in the future")
         if (event.latitude == 0.0 && event.longitude == 0.0) return EventResult.Error("Valid location is required")
 
-        val id = eventDao.insertEvent(event)
-        syncEventToFirestore(event.copy(id = id))
-        return EventResult.Success(id)
+        val firestoreId = event.firestoreId.ifBlank {
+            eventsCollection.document().id
+        }
+
+        val eventWithFirestoreId = event.copy(firestoreId = firestoreId)
+        val localId = eventDao.insertEvent(eventWithFirestoreId)
+        val savedEvent = eventWithFirestoreId.copy(id = localId)
+
+        syncEventToFirestore(savedEvent)
+
+        return EventResult.Success(localId)
     }
 
     suspend fun getAllEvents(): List<Event> {
         return try {
             val snapshot = eventsCollection
+                .whereEqualTo("published", true)
                 .orderBy("startTime", Query.Direction.ASCENDING)
                 .get()
                 .await()
@@ -54,11 +63,18 @@ class EventRepository(context: Context) {
                 val data = doc.data ?: return@mapNotNull null
                 val hostUid = data["hostFirebaseUid"] as? String ?: return@mapNotNull null
                 val localHost = resolveOrCreateUser(hostUid, data)
-                Event.fromFirestoreMap(data, localHost.id)
+
+                Event.fromFirestoreMap(
+                    firestoreId = doc.id,
+                    data = data,
+                    localHostId = localHost.id
+                )
             }
 
             eventDao.deleteAll()
-            events.forEach { eventDao.insertEvent(it) }
+            events.forEach { event ->
+                eventDao.insertEvent(event)
+            }
 
             eventDao.getAllEvents()
         } catch (e: Exception) {
@@ -66,50 +82,71 @@ class EventRepository(context: Context) {
         }
     }
 
-    fun getEventById(id: Long): Event? = eventDao.findById(id)
+    fun getEventById(id: Long): Event? {
+        return eventDao.findById(id)
+    }
 
     fun updateEvent(hostId: Long, event: Event): EventResult {
         if (event.hostId != hostId) return EventResult.Error("Unauthorized")
-
         if (event.sport.isBlank()) return EventResult.Error("Sport is required")
         if (event.title.isBlank()) return EventResult.Error("Title is required")
         if (event.maxPlayers < 1) return EventResult.Error("Max players must be at least 1")
 
-        eventDao.updateEvent(event)
-        syncEventToFirestore(event)
-        return EventResult.Success(event.id)
+        val firestoreId = event.firestoreId.ifBlank {
+            eventsCollection.document().id
+        }
+
+        val updatedEvent = event.copy(firestoreId = firestoreId)
+        eventDao.updateEvent(updatedEvent)
+        syncEventToFirestore(updatedEvent)
+
+        return EventResult.Success(updatedEvent.id)
     }
 
     fun deleteEvent(hostId: Long, event: Event): EventResult {
         if (event.hostId != hostId) return EventResult.Error("Unauthorized")
+
         eventDao.deleteEvent(event)
-        eventsCollection.document(event.id.toString()).delete()
+
+        if (event.firestoreId.isNotBlank()) {
+            eventsCollection.document(event.firestoreId).delete()
+        }
+
         return EventResult.Success(event.id)
     }
 
     fun postComment(eventId: Long, authorId: Long, content: String): EventResult {
+        if (content.isBlank()) return EventResult.Error("Comment cannot be empty")
+
+        val event = eventDao.findById(eventId)
+            ?: return EventResult.Error("Event not found")
+
         val comment = Comment(
             eventId = eventId,
             authorId = authorId,
             content = content,
             timestamp = System.currentTimeMillis()
         )
-        val id = commentDao.insertComment(comment)
-        syncCommentToFirestore(comment.copy(id = id))
-        return EventResult.Success(id)
+
+        val localCommentId = commentDao.insertComment(comment)
+        val savedComment = comment.copy(id = localCommentId)
+
+        syncCommentToFirestore(savedComment, event)
+
+        return EventResult.Success(localCommentId)
     }
 
     suspend fun getCommentsForEvent(eventId: Long): List<Comment> {
-        val event = eventDao.findById(eventId) ?: return commentDao.getCommentsByEvent(eventId)
-        val host = userDao.findById(event.hostId)
-        val hostUid = host?.firebaseUid ?: return commentDao.getCommentsByEvent(eventId)
+        val event = eventDao.findById(eventId)
+            ?: return commentDao.getCommentsByEvent(eventId)
+
+        if (event.firestoreId.isBlank()) {
+            return commentDao.getCommentsByEvent(eventId)
+        }
 
         return try {
-            val firestoreEventId = findFirestoreEventId(event, hostUid)
-                ?: return commentDao.getCommentsByEvent(eventId)
-
             val snapshot = commentsCollection
-                .whereEqualTo("eventFirestoreId", firestoreEventId)
+                .whereEqualTo("eventFirestoreId", event.firestoreId)
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get()
                 .await()
@@ -118,11 +155,18 @@ class EventRepository(context: Context) {
                 val data = doc.data ?: return@mapNotNull null
                 val authorUid = data["authorFirebaseUid"] as? String ?: return@mapNotNull null
                 val localAuthor = resolveOrCreateUser(authorUid, data)
-                Comment.fromFirestoreMap(data, eventId, localAuthor.id)
+
+                Comment.fromFirestoreMap(
+                    data = data,
+                    localEventId = eventId,
+                    localAuthorId = localAuthor.id
+                )
             }
 
             commentDao.deleteByEvent(eventId)
-            comments.forEach { commentDao.insertComment(it) }
+            comments.forEach { comment ->
+                commentDao.insertComment(comment)
+            }
 
             commentDao.getCommentsByEvent(eventId)
         } catch (e: Exception) {
@@ -130,14 +174,89 @@ class EventRepository(context: Context) {
         }
     }
 
-    private suspend fun findFirestoreEventId(event: Event, hostUid: String): String? {
-        val snapshot = eventsCollection
-            .whereEqualTo("hostFirebaseUid", hostUid)
-            .whereEqualTo("title", event.title)
-            .whereEqualTo("startTime", event.startTime)
-            .get()
-            .await()
-        return snapshot.documents.firstOrNull()?.id
+    fun joinEvent(eventId: Long, userId: Long) {
+        val event = eventDao.findById(eventId) ?: return
+        val user = userDao.findById(userId) ?: return
+
+        val join = EventJoin(eventId = eventId, userId = userId)
+        eventJoinDao.insert(join)
+
+        val eventFirestoreId = event.firestoreId.ifBlank { return }
+        val userUid = user.firebaseUid
+        val firestoreKey = "${userUid}_$eventFirestoreId"
+
+        joinsCollection.document(firestoreKey)
+            .set(join.toFirestoreMap(eventFirestoreId, userUid))
+    }
+
+    fun unjoinEvent(eventId: Long, userId: Long) {
+        eventJoinDao.delete(eventId, userId)
+
+        val event = eventDao.findById(eventId) ?: return
+        val user = userDao.findById(userId) ?: return
+
+        val eventFirestoreId = event.firestoreId.ifBlank { return }
+        val firestoreKey = "${user.firebaseUid}_$eventFirestoreId"
+
+        joinsCollection.document(firestoreKey).delete()
+    }
+
+    fun isJoined(eventId: Long, userId: Long): Boolean {
+        return eventJoinDao.isJoined(eventId, userId)
+    }
+
+    fun getJoinCount(eventId: Long): Int {
+        return eventJoinDao.getJoinCount(eventId)
+    }
+
+    fun rateEvent(eventId: Long, userId: Long, stars: Int) {
+        val event = eventDao.findById(eventId) ?: return
+        val user = userDao.findById(userId) ?: return
+
+        val safeStars = stars.coerceIn(1, 5)
+        val rating = EventRating(eventId = eventId, userId = userId, stars = safeStars)
+
+        eventRatingDao.insert(rating)
+
+        val eventFirestoreId = event.firestoreId.ifBlank { return }
+        val firestoreKey = "${user.firebaseUid}_$eventFirestoreId"
+
+        ratingsCollection.document(firestoreKey)
+            .set(rating.toFirestoreMap(eventFirestoreId, user.firebaseUid))
+    }
+
+    fun getUserRating(eventId: Long, userId: Long): Int? {
+        return eventRatingDao.getRating(eventId, userId)
+    }
+
+    fun getAverageRating(eventId: Long): Float {
+        return eventRatingDao.getAverageRating(eventId) ?: 0f
+    }
+
+    private fun syncEventToFirestore(event: Event) {
+        val host = userDao.findById(event.hostId)
+        val hostUid = host?.firebaseUid ?: return
+
+        val data = event.toFirestoreMap(hostUid).toMutableMap()
+        data["email"] = host.email
+        data["displayName"] = host.displayName
+
+        eventsCollection.document(event.firestoreId).set(data)
+    }
+
+    private fun syncCommentToFirestore(comment: Comment, event: Event) {
+        val author = userDao.findById(comment.authorId) ?: return
+        val eventFirestoreId = event.firestoreId.ifBlank { return }
+
+        val data = comment.toFirestoreMap(
+            eventFirestoreId = eventFirestoreId,
+            authorFirebaseUid = author.firebaseUid
+        ).toMutableMap()
+
+        data["email"] = author.email
+        data["displayName"] = author.displayName
+
+        commentsCollection.document().set(data)
     }
 
     private fun resolveOrCreateUser(firebaseUid: String, data: Map<String, Any?>): User {
@@ -149,72 +268,9 @@ class EventRepository(context: Context) {
             email = data["email"] as? String ?: "",
             displayName = data["displayName"] as? String ?: ""
         )
-        val id = userDao.insertUser(user)
-        return user.copy(id = id)
-    }
 
-    private fun syncEventToFirestore(event: Event) {
-        val host = userDao.findById(event.hostId)
-        val hostUid = host?.firebaseUid ?: ""
-        eventsCollection.document(event.id.toString()).set(event.toFirestoreMap(hostUid))
-    }
-
-    private fun syncCommentToFirestore(comment: Comment) {
-        val author = userDao.findById(comment.authorId)
-        val authorUid = author?.firebaseUid ?: ""
-        commentsCollection.document(comment.id.toString())
-            .set(comment.toFirestoreMap(comment.eventId.toString(), authorUid))
-    }
-
-    fun joinEvent(eventId: Long, userId: Long) {
-        val join = EventJoin(eventId = eventId, userId = userId)
-        eventJoinDao.insert(join)
-        syncJoinToFirestore(join)
-    }
-
-    fun unjoinEvent(eventId: Long, userId: Long) {
-        eventJoinDao.delete(eventId, userId)
-        val user = userDao.findById(userId)
-        val event = eventDao.findById(eventId)
-        val host = event?.let { userDao.findById(it.hostId) }
-        val firestoreKey = "${user?.firebaseUid}_${event?.id}"
-        joinsCollection.document(firestoreKey).delete()
-    }
-
-    fun isJoined(eventId: Long, userId: Long): Boolean =
-        eventJoinDao.isJoined(eventId, userId)
-
-    fun getJoinCount(eventId: Long): Int =
-        eventJoinDao.getJoinCount(eventId)
-
-    fun rateEvent(eventId: Long, userId: Long, stars: Int) {
-        val rating = EventRating(eventId = eventId, userId = userId, stars = stars)
-        eventRatingDao.insert(rating)
-        syncRatingToFirestore(rating)
-    }
-
-    fun getUserRating(eventId: Long, userId: Long): Int? =
-        eventRatingDao.getRating(eventId, userId)
-
-    fun getAverageRating(eventId: Long): Float =
-        eventRatingDao.getAverageRating(eventId) ?: 0f
-
-    private fun syncJoinToFirestore(join: EventJoin) {
-        val user = userDao.findById(join.userId)
-        val event = eventDao.findById(join.eventId)
-        val host = event?.let { userDao.findById(it.hostId) }
-        val userUid = user?.firebaseUid ?: ""
-        val firestoreKey = "${userUid}_${join.eventId}"
-        joinsCollection.document(firestoreKey)
-            .set(join.toFirestoreMap(join.eventId.toString(), userUid))
-    }
-
-    private fun syncRatingToFirestore(rating: EventRating) {
-        val user = userDao.findById(rating.userId)
-        val userUid = user?.firebaseUid ?: ""
-        val firestoreKey = "${userUid}_${rating.eventId}"
-        ratingsCollection.document(firestoreKey)
-            .set(rating.toFirestoreMap(rating.eventId.toString(), userUid))
+        val localId = userDao.insertUser(user)
+        return user.copy(id = localId)
     }
 
     companion object {
