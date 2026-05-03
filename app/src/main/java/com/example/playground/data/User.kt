@@ -13,4 +13,18 @@ data class User(
     val firebaseUid: String,
     val email: String,
     val displayName: String = ""
-)
+) {
+    fun toFirestoreMap(): Map<String, Any> = mapOf(
+        "firebaseUid" to firebaseUid,
+        "email" to email,
+        "displayName" to displayName
+    )
+
+    companion object {
+        fun fromFirestoreMap(data: Map<String, Any?>): User = User(
+            firebaseUid = data["firebaseUid"] as? String ?: "",
+            email = data["email"] as? String ?: "",
+            displayName = data["displayName"] as? String ?: ""
+        )
+    }
+}
