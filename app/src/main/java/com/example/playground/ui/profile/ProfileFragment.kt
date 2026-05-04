@@ -7,16 +7,23 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import com.example.playground.R
 import com.example.playground.SignInActivity
-import com.example.playground.auth.AuthManager
+import com.example.playground.repository.AuthRepository
+import com.example.playground.viewmodel.ProfileViewModel
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 
 class ProfileFragment : Fragment() {
 
-    private lateinit var authManager: AuthManager
-    private var isEditing = false
+    private lateinit var viewModel: ProfileViewModel
+
+    private lateinit var nameInput: TextInputEditText
+    private lateinit var emailInput: TextInputEditText
+    private lateinit var savedCourtsInput: TextInputEditText
+    private lateinit var editProfileButton: MaterialButton
+    private lateinit var logoutButton: MaterialButton
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -27,42 +34,57 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        authManager = AuthManager(requireContext())
 
-        var user = authManager.getCurrentUser()
+        val authRepository = AuthRepository.getInstance(requireContext())
+        viewModel = ViewModelProvider(
+            this,
+            ProfileViewModel.Factory(authRepository)
+        )[ProfileViewModel::class.java]
 
-        val nameInput = view.findViewById<TextInputEditText>(R.id.nameInput)
-        val emailInput = view.findViewById<TextInputEditText>(R.id.emailInput)
-        val savedCourtsInput = view.findViewById<TextInputEditText>(R.id.savedCourtsInput)
-        val editProfileButton = view.findViewById<MaterialButton>(R.id.editProfileButton)
-        val logoutButton = view.findViewById<MaterialButton>(R.id.logoutButton)
+        nameInput = view.findViewById(R.id.nameInput)
+        emailInput = view.findViewById(R.id.emailInput)
+        savedCourtsInput = view.findViewById(R.id.savedCourtsInput)
+        editProfileButton = view.findViewById(R.id.editProfileButton)
+        logoutButton = view.findViewById(R.id.logoutButton)
 
-        nameInput.setText(user?.displayName?.ifEmpty { user?.email } ?: "Guest")
-        emailInput.setText(user?.email ?: "")
         savedCourtsInput.setText("0 saved courts")
         nameInput.isEnabled = false
 
+        observeViewModel()
+        setupActions()
+        viewModel.loadUser()
+    }
+
+    private fun observeViewModel() {
+        viewModel.user.observe(viewLifecycleOwner) { user ->
+            nameInput.setText(user?.displayName?.ifEmpty { user.email } ?: "Guest")
+            emailInput.setText(user?.email ?: "")
+        }
+
+        viewModel.isEditing.observe(viewLifecycleOwner) { editing ->
+            nameInput.isEnabled = editing
+            editProfileButton.text = if (editing) "Save Profile" else "Edit Profile"
+            if (editing) nameInput.requestFocus()
+        }
+
+        viewModel.profileSaved.observe(viewLifecycleOwner) { saved ->
+            if (saved) {
+                Toast.makeText(requireContext(), "Profile updated", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupActions() {
         editProfileButton.setOnClickListener {
-            if (isEditing) {
-                val newName = nameInput.text.toString().trim()
-                if (newName.isNotEmpty() && user != null) {
-                    user = user!!.copy(displayName = newName)
-                    authManager.updateUser(user!!)
-                    nameInput.isEnabled = false
-                    editProfileButton.text = "Edit Profile"
-                    isEditing = false
-                    Toast.makeText(requireContext(), "Profile updated", Toast.LENGTH_SHORT).show()
-                }
+            if (viewModel.isEditing.value == true) {
+                viewModel.saveProfile(nameInput.text.toString().trim())
             } else {
-                nameInput.isEnabled = true
-                nameInput.requestFocus()
-                editProfileButton.text = "Save Profile"
-                isEditing = true
+                viewModel.startEditing()
             }
         }
 
         logoutButton.setOnClickListener {
-            authManager.signOut()
+            viewModel.signOut()
             requireActivity().finish()
             startActivity(Intent(requireContext(), SignInActivity::class.java))
         }
