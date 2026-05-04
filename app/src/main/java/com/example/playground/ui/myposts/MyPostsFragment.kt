@@ -17,6 +17,7 @@ import com.example.playground.repository.EventRepository
 import com.example.playground.viewmodel.MyPostsViewModel
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
 import android.app.AlertDialog
 import android.net.Uri
@@ -28,6 +29,7 @@ class MyPostsFragment : Fragment() {
     private lateinit var viewModel: MyPostsViewModel
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyText: TextView
+    private lateinit var progressIndicator: CircularProgressIndicator
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -46,6 +48,7 @@ class MyPostsFragment : Fragment() {
 
         recyclerView = view.findViewById(R.id.recyclerView)
         emptyText = view.findViewById(R.id.emptyText)
+        progressIndicator = view.findViewById(R.id.progressIndicator)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         observeViewModel()
@@ -53,6 +56,18 @@ class MyPostsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
+            progressIndicator.visibility = if (loading) View.VISIBLE else View.GONE
+            if (loading) {
+                recyclerView.visibility = View.GONE
+                emptyText.visibility = View.GONE
+            } else {
+                val empty = viewModel.isEmpty.value ?: true
+                recyclerView.visibility = if (empty) View.GONE else View.VISIBLE
+                emptyText.visibility = if (empty) View.VISIBLE else View.GONE
+            }
+        }
+
         viewModel.myEvents.observe(viewLifecycleOwner) { events ->
             recyclerView.adapter = MyEventsAdapter(
                 items = events.toMutableList(),
@@ -62,6 +77,7 @@ class MyPostsFragment : Fragment() {
         }
 
         viewModel.isEmpty.observe(viewLifecycleOwner) { empty ->
+            if (viewModel.isLoading.value == true) return@observe
             recyclerView.visibility = if (empty) View.GONE else View.VISIBLE
             emptyText.visibility = if (empty) View.VISIBLE else View.GONE
         }
