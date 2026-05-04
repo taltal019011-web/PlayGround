@@ -6,12 +6,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.setupWithNavController
 import com.example.playground.auth.AuthManager
-import com.example.playground.ui.home.CreateEventFragment
-import com.example.playground.ui.map.MapFragment
-import com.example.playground.ui.myposts.MyPostsFragment
-import com.example.playground.ui.profile.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
@@ -38,27 +35,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        val navController = navHostFragment.navController
+
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-
-        bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_map -> replaceFragment(MapFragment())
-                R.id.nav_create -> replaceFragment(CreateEventFragment())
-                R.id.nav_my_posts -> replaceFragment(MyPostsFragment())
-                R.id.nav_profile -> replaceFragment(ProfileFragment())
-            }
-            true
-        }
-
-        if (savedInstanceState == null) {
-            replaceFragment(MapFragment())
-            bottomNav.selectedItemId = R.id.nav_map
-        }
-    }
-
-    private fun replaceFragment(fragment: Fragment) {
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.nav_host_fragment, fragment)
-            .commit()
+        bottomNav.setupWithNavController(navController)
     }
 }

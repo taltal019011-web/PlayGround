@@ -16,13 +16,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModelProvider
 import com.example.playground.R
-import com.example.playground.auth.AuthManager
 import com.example.playground.data.Event
 import com.example.playground.data.Venue
 import com.example.playground.data.Venues
+import com.example.playground.repository.AuthRepository
 import com.example.playground.repository.EventRepository
+import com.example.playground.viewmodel.MapViewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -33,12 +34,10 @@ import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.textfield.TextInputEditText
-import kotlinx.coroutines.launch
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
-    private lateinit var authManager: AuthManager
-    private lateinit var eventRepository: EventRepository
+    private lateinit var viewModel: MapViewModel
 
     private var googleMap: GoogleMap? = null
     private var userLocation: LatLng? = null
@@ -85,9 +84,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var eventImageView: android.widget.ImageView
 
-    private var allEvents: List<Event> = emptyList()
-    private var selectedSport: String = "All"
-    private var selectedEvent: Event? = null
     private var activeExpanded = true
 
     companion object {
@@ -106,11 +102,16 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        authManager = AuthManager(requireContext())
-        eventRepository = EventRepository.getInstance(requireContext())
+        val authRepository = AuthRepository.getInstance(requireContext())
+        val eventRepository = EventRepository.getInstance(requireContext())
+        viewModel = ViewModelProvider(
+            this,
+            MapViewModel.Factory(authRepository, eventRepository)
+        )[MapViewModel::class.java]
 
         bindViews(view)
         setupActions()
+        observeViewModel()
 
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as? SupportMapFragment
         mapFragment?.getMapAsync(this)
@@ -175,18 +176,22 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         imComingButton.setOnClickListener {
-            joinSelectedEvent()
+            viewModel.joinOrUnjoinEvent()
         }
 
         addCommentButton.setOnClickListener {
-            addCommentToSelectedEvent()
+            val text = commentInput.text.toString().trim()
+            if (text.isNotBlank()) {
+                viewModel.postComment(text)
+                commentInput.setText("")
+            }
         }
 
-        star1.setOnClickListener { rateSelectedEvent(1) }
-        star2.setOnClickListener { rateSelectedEvent(2) }
-        star3.setOnClickListener { rateSelectedEvent(3) }
-        star4.setOnClickListener { rateSelectedEvent(4) }
-        star5.setOnClickListener { rateSelectedEvent(5) }
+        star1.setOnClickListener { viewModel.rateEvent(1) }
+        star2.setOnClickListener { viewModel.rateEvent(2) }
+        star3.setOnClickListener { viewModel.rateEvent(3) }
+        star4.setOnClickListener { viewModel.rateEvent(4) }
+        star5.setOnClickListener { viewModel.rateEvent(5) }
 
         chipAllSports.setOnClickListener { setSport("All") }
         chipBasketball.setOnClickListener { setSport("Basketball") }
@@ -196,7 +201,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                applyFilters()
+                viewModel.setSearchQuery(searchInput.text?.toString().orEmpty())
                 true
             } else {
                 false
@@ -204,6 +209,21 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         updateChipSelection()
+    }
+
+    private fun observeViewModel() {
+        viewModel.filteredEvents.observe(viewLifecycleOwner) { events ->
+            showMarkers(events)
+            activeGamesCountText.text = "${events.size} games near you"
+        }
+
+        viewModel.eventDetails.observe(viewLifecycleOwner) { details ->
+            if (details != null) renderDetails(details)
+        }
+
+        viewModel.comments.observe(viewLifecycleOwner) { comments ->
+            renderComments(comments)
+        }
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -216,7 +236,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         map.setOnMarkerClickListener { marker ->
             val event = marker.tag as? Event
             if (event != null) {
-                showDetails(event)
+                detailsCard.visibility = View.VISIBLE
+                viewModel.selectEvent(event)
                 map.animateCamera(
                     CameraUpdateFactory.newLatLngZoom(
                         LatLng(event.latitude, event.longitude),
@@ -231,43 +252,22 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             closeDetails()
         }
 
-        lifecycleScope.launch {
-            allEvents = eventRepository.getAllEvents()
-            applyFilters()
-        }
+        viewModel.loadEvents()
         enableMyLocation()
     }
 
     private fun setSport(sport: String) {
-        selectedSport = sport
+        viewModel.setSport(sport)
         updateChipSelection()
-        applyFilters()
     }
 
     private fun updateChipSelection() {
-        chipAllSports.isChecked = selectedSport == "All"
-        chipBasketball.isChecked = selectedSport == "Basketball"
-        chipFootball.isChecked = selectedSport == "Football"
-        chipTennis.isChecked = selectedSport == "Tennis"
-        chipVolleyball.isChecked = selectedSport == "Volleyball"
-    }
-
-    private fun applyFilters() {
-        val query = searchInput.text?.toString().orEmpty().trim().lowercase()
-
-        val filtered = allEvents.filter { event ->
-            val hasCoordinates = event.latitude != 0.0 && event.longitude != 0.0
-            val sportMatches = selectedSport == "All" || event.sport.equals(selectedSport, ignoreCase = true)
-            val textMatches = query.isEmpty() ||
-                    event.title.lowercase().contains(query) ||
-                    event.sport.lowercase().contains(query) ||
-                    event.locationLabel.lowercase().contains(query)
-
-            hasCoordinates && sportMatches && textMatches
-        }
-
-        showMarkers(filtered)
-        activeGamesCountText.text = "${filtered.size} games near you"
+        val sport = viewModel.selectedSport
+        chipAllSports.isChecked = sport == "All"
+        chipBasketball.isChecked = sport == "Basketball"
+        chipFootball.isChecked = sport == "Football"
+        chipTennis.isChecked = sport == "Tennis"
+        chipVolleyball.isChecked = sport == "Volleyball"
     }
 
     private fun showMarkers(events: List<Event>) {
@@ -286,34 +286,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    private fun showDetails(event: Event) {
-        selectedEvent = event
-        detailsCard.visibility = View.VISIBLE
-        renderDetails(event)
-
-        lifecycleScope.launch {
-            eventRepository.fetchJoinsForEvent(event.id)
-            eventRepository.fetchRatingsForEvent(event.id)
-            refreshComments(event.id)
-            if (selectedEvent?.id == event.id) {
-                renderDetails(event)
-            }
-        }
-    }
-
-    private fun renderDetails(event: Event) {
-        val currentUser = authManager.getCurrentUser()
-        val participantCount = eventRepository.getJoinCount(event.id)
-        val isJoined = currentUser != null && eventRepository.isJoined(event.id, currentUser.id)
-        val userRating = currentUser?.let { eventRepository.getUserRating(event.id, it.id) }
-        val avgRating = eventRepository.getAverageRating(event.id)
-        val displayRating = userRating ?: avgRating.toInt().coerceAtLeast(1)
+    private fun renderDetails(details: MapViewModel.EventDetails) {
+        val event = details.event
+        val displayRating = details.userRating ?: details.averageRating.toInt().coerceAtLeast(1)
 
         hostAvatarText.text = getSportEmoji(event.sport)
-        hostNameText.text = getHostDisplayName(event)
+        hostNameText.text = details.hostDisplayName
         postedAgoText.text = formatTimeAgo(event.startTime)
         sportChipText.text = event.sport
-        joiningCountText.text = "$participantCount / ${event.maxPlayers} joining"
+        joiningCountText.text = "${details.participantCount} / ${event.maxPlayers} joining"
         titleText.text = event.title
         descriptionText.text = event.description ?: ""
         locationText.text = "📍 ${event.locationLabel}"
@@ -331,18 +312,16 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         when {
-            isJoined -> {
+            details.isJoined -> {
                 imComingButton.text = "Cancel Join"
                 imComingButton.isEnabled = true
-
                 imComingButton.setBackgroundColor(0xFFE0E0E0.toInt())
                 imComingButton.setTextColor(0xFF444444.toInt())
             }
 
-            participantCount >= event.maxPlayers -> {
+            details.participantCount >= event.maxPlayers -> {
                 imComingButton.text = "Game Full"
                 imComingButton.isEnabled = false
-
                 imComingButton.setBackgroundColor(0xFFCCCCCC.toInt())
                 imComingButton.setTextColor(0xFF888888.toInt())
             }
@@ -350,7 +329,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             else -> {
                 imComingButton.text = "I'm Coming!"
                 imComingButton.isEnabled = true
-
                 imComingButton.setBackgroundColor(0xFF2A5BD7.toInt())
                 imComingButton.setTextColor(0xFFFFFFFF.toInt())
             }
@@ -359,69 +337,72 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         updateRatingViews(displayRating)
     }
 
-    private fun getHostDisplayName(event: Event): String {
-        val currentUser = authManager.getCurrentUser()
-        return if (currentUser != null && currentUser.id == event.hostId) {
-            currentUser.displayName.ifEmpty { currentUser.email }
-        } else {
-            "Host #${event.hostId}"
-        }
-    }
+    private fun renderComments(comments: List<MapViewModel.CommentWithAuthor>) {
+        commentsHeaderText.text = "Comments (${comments.size})"
+        commentListContainer.removeAllViews()
 
-    private fun joinSelectedEvent() {
-        val event = selectedEvent ?: return
-        val currentUser = authManager.getCurrentUser() ?: return
-
-        if (eventRepository.isJoined(event.id, currentUser.id)) {
-            eventRepository.unjoinEvent(event.id, currentUser.id)
-        } else {
-            val joinCount = eventRepository.getJoinCount(event.id)
-            if (joinCount >= event.maxPlayers) {
-                renderDetails(event)
-                return
+        for (item in comments) {
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 14, 0, 0)
+                }
             }
-            eventRepository.joinEvent(event.id, currentUser.id)
-        }
-        renderDetails(event)
-    }
 
-    private fun rateSelectedEvent(stars: Int) {
-        val event = selectedEvent ?: return
-        val currentUser = authManager.getCurrentUser() ?: return
-        val clamped = stars.coerceIn(1, 5)
-        eventRepository.rateEvent(event.id, currentUser.id, clamped)
-        renderDetails(event)
-    }
-
-    private fun updateRatingViews(rating: Int) {
-        val stars = listOf(star1, star2, star3, star4, star5)
-
-        stars.forEachIndexed { index, textView ->
-            val selected = index < rating
-            textView.text = if (selected) "★" else "☆"
-            textView.alpha = if (selected) 1f else 0.45f
-        }
-
-        ratingValueText.text = "%.1f".format(rating.toFloat())
-    }
-
-    private fun addCommentToSelectedEvent() {
-        val event = selectedEvent ?: return
-        val user = authManager.getCurrentUser() ?: return
-        val text = commentInput.text.toString().trim()
-
-        if (text.isNotBlank()) {
-            eventRepository.postComment(event.id, user.id, text)
-            commentInput.setText("")
-            lifecycleScope.launch {
-                refreshComments(event.id)
+            val avatar = TextView(requireContext()).apply {
+                text = "👤"
+                textSize = 22f
+                gravity = Gravity.CENTER
+                setBackgroundColor(0xFFE8F0FE.toInt())
+                layoutParams = LinearLayout.LayoutParams(44.dpToPx(), 44.dpToPx())
             }
+
+            val bubble = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(0xFFF5F5F5.toInt())
+                setPadding(14.dpToPx(), 12.dpToPx(), 14.dpToPx(), 12.dpToPx())
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    setMargins(12.dpToPx(), 0, 0, 0)
+                }
+            }
+
+            val authorView = TextView(requireContext()).apply {
+                text = item.authorName
+                textSize = 15f
+                setTextColor(0xFF444444.toInt())
+                setTypeface(null, Typeface.BOLD)
+            }
+
+            val bodyView = TextView(requireContext()).apply {
+                text = item.comment.content
+                textSize = 15f
+                setTextColor(0xFF555555.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 5.dpToPx(), 0, 0)
+                }
+            }
+
+            bubble.addView(authorView)
+            bubble.addView(bodyView)
+            row.addView(avatar)
+            row.addView(bubble)
+            commentListContainer.addView(row)
         }
     }
 
     private fun closeDetails() {
         detailsCard.visibility = View.GONE
-        selectedEvent = null
+        viewModel.clearSelectedEvent()
     }
 
     @SuppressLint("MissingPermission")
@@ -516,76 +497,16 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }.sortedBy { it.second }
     }
 
-    private suspend fun refreshComments(eventId: Long) {
-        val comments = eventRepository.getCommentsForEvent(eventId)
-        val currentUser = authManager.getCurrentUser()
+    private fun updateRatingViews(rating: Int) {
+        val stars = listOf(star1, star2, star3, star4, star5)
 
-        commentsHeaderText.text = "Comments (${comments.size})"
-        commentListContainer.removeAllViews()
-
-        for (comment in comments) {
-            val authorName = if (currentUser != null && currentUser.id == comment.authorId) {
-                currentUser.displayName.ifEmpty { currentUser.email }
-            } else {
-                "User ${comment.authorId}"
-            }
-
-            val row = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 14, 0, 0)
-                }
-            }
-
-            val avatar = TextView(requireContext()).apply {
-                text = "👤"
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setBackgroundColor(0xFFE8F0FE.toInt())
-                layoutParams = LinearLayout.LayoutParams(44.dpToPx(), 44.dpToPx())
-            }
-
-            val bubble = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(0xFFF5F5F5.toInt())
-                setPadding(14.dpToPx(), 12.dpToPx(), 14.dpToPx(), 12.dpToPx())
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply {
-                    setMargins(12.dpToPx(), 0, 0, 0)
-                }
-            }
-
-            val authorView = TextView(requireContext()).apply {
-                text = authorName
-                textSize = 15f
-                setTextColor(0xFF444444.toInt())
-                setTypeface(null, Typeface.BOLD)
-            }
-
-            val bodyView = TextView(requireContext()).apply {
-                text = comment.content
-                textSize = 15f
-                setTextColor(0xFF555555.toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 5.dpToPx(), 0, 0)
-                }
-            }
-
-            bubble.addView(authorView)
-            bubble.addView(bodyView)
-            row.addView(avatar)
-            row.addView(bubble)
-            commentListContainer.addView(row)
+        stars.forEachIndexed { index, textView ->
+            val selected = index < rating
+            textView.text = if (selected) "★" else "☆"
+            textView.alpha = if (selected) 1f else 0.45f
         }
+
+        ratingValueText.text = "%.1f".format(rating.toFloat())
     }
 
     private fun getSportEmoji(sport: String): String {
