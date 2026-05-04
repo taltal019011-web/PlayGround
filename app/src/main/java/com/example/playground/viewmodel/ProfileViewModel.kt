@@ -28,11 +28,15 @@ class ProfileViewModel(
         _isEditing.value = true
     }
 
-    fun saveProfile(newName: String) {
+    fun saveProfile(newName: String, profileImageUrl: String?) {
         val current = _user.value ?: return
         if (newName.isBlank()) return
 
-        val updated = current.copy(displayName = newName)
+        val updated = current.copy(
+            displayName = newName,
+            profileImageUrl = profileImageUrl ?: current.profileImageUrl
+        )
+
         authRepository.updateUser(updated)
         _user.value = updated
         _isEditing.value = false

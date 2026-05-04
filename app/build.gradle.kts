@@ -60,6 +60,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
+    implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.squareup.picasso:picasso:2.8")
     ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.firebase.bom))
