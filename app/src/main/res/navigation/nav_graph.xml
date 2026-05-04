@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/mapFragment">
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.example.playground.ui.map.MapFragment"
+        android:label="Map"
+        tools:layout="@layout/fragment_map" />
+
+    <fragment
+        android:id="@+id/createEventFragment"
+        android:name="com.example.playground.ui.home.CreateEventFragment"
+        android:label="Create"
+        tools:layout="@layout/fragment_create_event" />
+
+    <fragment
+        android:id="@+id/myPostsFragment"
+        android:name="com.example.playground.ui.myposts.MyPostsFragment"
+        android:label="My Posts"
+        tools:layout="@layout/fragment_my_posts" />
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.playground.ui.profile.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
+
+</navigation>
