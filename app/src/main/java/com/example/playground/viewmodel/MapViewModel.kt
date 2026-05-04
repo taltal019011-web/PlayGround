@@ -22,6 +22,9 @@ class MapViewModel(
     private val _filteredEvents = MutableLiveData<List<Event>>(emptyList())
     val filteredEvents: LiveData<List<Event>> = _filteredEvents
 
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private val _selectedEvent = MutableLiveData<Event?>(null)
     val selectedEvent: LiveData<Event?> = _selectedEvent
 
@@ -38,9 +41,11 @@ class MapViewModel(
         private set
 
     fun loadEvents() {
+        _isLoading.value = true
         viewModelScope.launch {
             _allEvents.value = eventRepository.getAllEvents()
             applyFilters()
+            _isLoading.value = false
         }
     }
 

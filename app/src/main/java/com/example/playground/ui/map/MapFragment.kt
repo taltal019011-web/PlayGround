@@ -33,6 +33,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
 
 class MapFragment : Fragment(), OnMapReadyCallback {
@@ -83,6 +84,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var imComingButton: MaterialButton
 
     private lateinit var eventImageView: android.widget.ImageView
+    private lateinit var progressIndicator: LinearProgressIndicator
 
     private var activeExpanded = true
 
@@ -158,6 +160,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         addCommentButton = view.findViewById(R.id.addCommentButton)
         imComingButton = view.findViewById(R.id.imComingButton)
         eventImageView = view.findViewById(R.id.eventImageView)
+        progressIndicator = view.findViewById(R.id.progressIndicator)
     }
 
     private fun setupActions() {
@@ -212,6 +215,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun observeViewModel() {
+        viewModel.isLoading.observe(viewLifecycleOwner) { loading ->
+            progressIndicator.visibility = if (loading) View.VISIBLE else View.GONE
+        }
+
         viewModel.filteredEvents.observe(viewLifecycleOwner) { events ->
             showMarkers(events)
             activeGamesCountText.text = "${events.size} games near you"

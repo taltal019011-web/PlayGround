@@ -21,16 +21,20 @@ class MyPostsViewModel(
     private val _isEmpty = MutableLiveData(true)
     val isEmpty: LiveData<Boolean> = _isEmpty
 
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private val _operationResult = MutableLiveData<OperationResult?>()
     val operationResult: LiveData<OperationResult?> = _operationResult
 
     fun loadEvents() {
         val user = authRepository.getCurrentUser() ?: return
+        _isLoading.value = true
         viewModelScope.launch {
-            val all = eventRepository.getAllEvents()
-            val mine = all.filter { it.hostId == user.id }
-            _myEvents.value = mine
-            _isEmpty.value = mine.isEmpty()
+            val all = eventRepository.getEventsByHost(user.id)
+            _myEvents.value = all
+            _isEmpty.value = all.isEmpty()
+            _isLoading.value = false
         }
     }
 
@@ -39,7 +43,7 @@ class MyPostsViewModel(
         when (val result = eventRepository.deleteEvent(user.id, event)) {
             is EventRepository.EventResult.Success -> {
                 _operationResult.value = OperationResult.Success("Post deleted")
-                loadEvents()
+                loadLocalEvents()
             }
             is EventRepository.EventResult.Error -> {
                 _operationResult.value = OperationResult.Error(result.message)
@@ -52,12 +56,19 @@ class MyPostsViewModel(
         when (val result = eventRepository.updateEvent(user.id, event)) {
             is EventRepository.EventResult.Success -> {
                 _operationResult.value = OperationResult.Success("Post updated")
-                loadEvents()
+                loadLocalEvents()
             }
             is EventRepository.EventResult.Error -> {
                 _operationResult.value = OperationResult.Error(result.message)
             }
         }
+    }
+
+    private fun loadLocalEvents() {
+        val user = authRepository.getCurrentUser() ?: return
+        val mine = eventRepository.getLocalEventsByHost(user.id)
+        _myEvents.value = mine
+        _isEmpty.value = mine.isEmpty()
     }
 
     fun clearOperationResult() {
