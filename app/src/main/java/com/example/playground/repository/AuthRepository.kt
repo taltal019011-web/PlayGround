@@ -10,6 +10,10 @@ class AuthRepository(context: Context) {
 
     fun getCurrentUser(): User? = authManager.getCurrentUser()
 
+    fun updateUser(user: User) = authManager.updateUser(user)
+
+    fun signOut() = authManager.signOut()
+
     companion object {
         @Volatile
         private var instance: AuthRepository? = null

@@ -7,27 +7,25 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.playground.R
-import com.example.playground.auth.AuthManager
 import com.example.playground.data.Event
+import com.example.playground.repository.AuthRepository
 import com.example.playground.repository.EventRepository
+import com.example.playground.viewmodel.MyPostsViewModel
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import android.app.AlertDialog
 import android.net.Uri
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 
 class MyPostsFragment : Fragment() {
 
-    private lateinit var authManager: AuthManager
-    private lateinit var eventRepository: EventRepository
+    private lateinit var viewModel: MyPostsViewModel
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyText: TextView
 
@@ -38,34 +36,48 @@ class MyPostsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        authManager = AuthManager(requireContext())
-        eventRepository = EventRepository.getInstance(requireContext())
+
+        val authRepository = AuthRepository.getInstance(requireContext())
+        val eventRepository = EventRepository.getInstance(requireContext())
+        viewModel = ViewModelProvider(
+            this,
+            MyPostsViewModel.Factory(authRepository, eventRepository)
+        )[MyPostsViewModel::class.java]
+
         recyclerView = view.findViewById(R.id.recyclerView)
         emptyText = view.findViewById(R.id.emptyText)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        loadEvents()
+
+        observeViewModel()
+        viewModel.loadEvents()
     }
 
-    private fun loadEvents() {
-        val user = authManager.getCurrentUser() ?: return
-        lifecycleScope.launch {
-            loadEventsAsync(user.id)
-        }
-    }
-
-    private suspend fun loadEventsAsync(userId: Long) {
-        val myEvents = eventRepository.getAllEvents().filter { it.hostId == userId }
-        if (myEvents.isEmpty()) {
-            recyclerView.visibility = View.GONE
-            emptyText.visibility = View.VISIBLE
-        } else {
-            recyclerView.visibility = View.VISIBLE
-            emptyText.visibility = View.GONE
+    private fun observeViewModel() {
+        viewModel.myEvents.observe(viewLifecycleOwner) { events ->
             recyclerView.adapter = MyEventsAdapter(
-                items = myEvents.toMutableList(),
+                items = events.toMutableList(),
                 onEdit = { event -> showEditDialog(event) },
                 onDelete = { event -> showDeleteDialog(event) }
             )
+        }
+
+        viewModel.isEmpty.observe(viewLifecycleOwner) { empty ->
+            recyclerView.visibility = if (empty) View.GONE else View.VISIBLE
+            emptyText.visibility = if (empty) View.VISIBLE else View.GONE
+        }
+
+        viewModel.operationResult.observe(viewLifecycleOwner) { result ->
+            when (result) {
+                is MyPostsViewModel.OperationResult.Success -> {
+                    Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                    viewModel.clearOperationResult()
+                }
+                is MyPostsViewModel.OperationResult.Error -> {
+                    Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                    viewModel.clearOperationResult()
+                }
+                null -> {}
+            }
         }
     }
 
@@ -75,16 +87,7 @@ class MyPostsFragment : Fragment() {
             .setMessage("Are you sure you want to delete \"${event.title}\"?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Delete") { _, _ ->
-                val user = authManager.getCurrentUser() ?: return@setPositiveButton
-                when (val result = eventRepository.deleteEvent(user.id, event)) {
-                    is EventRepository.EventResult.Success -> {
-                        Toast.makeText(context, "Post deleted", Toast.LENGTH_SHORT).show()
-                        loadEvents()
-                    }
-                    is EventRepository.EventResult.Error -> {
-                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
-                    }
-                }
+                viewModel.deleteEvent(event)
             }
             .show()
     }
@@ -128,7 +131,6 @@ class MyPostsFragment : Fragment() {
         descriptionEdit.setText(event.description ?: "")
         maxPlayersEdit.setText(event.maxPlayers.toString())
 
-        // Load existing image
         editImageUri = event.imageUri?.let { Uri.parse(it) }
         editImageUri?.let {
             try {
@@ -148,25 +150,17 @@ class MyPostsFragment : Fragment() {
             .setView(dialogView)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Save") { _, _ ->
-                val user = authManager.getCurrentUser() ?: return@setPositiveButton
                 val updatedEvent = event.copy(
                     title = titleEdit.text.toString().ifBlank { event.title },
                     description = descriptionEdit.text.toString(),
                     maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers,
                     imageUri = editImageUri?.toString() ?: event.imageUri
                 )
-                when (val result = eventRepository.updateEvent(user.id, updatedEvent)) {
-                    is EventRepository.EventResult.Success -> {
-                        Toast.makeText(context, "Post updated", Toast.LENGTH_SHORT).show()
-                        loadEvents()
-                    }
-                    is EventRepository.EventResult.Error -> {
-                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
-                    }
-                }
+                viewModel.updateEvent(updatedEvent)
             }
             .show()
     }
+
     class MyEventsAdapter(
         private val items: MutableList<Event>,
         private val onEdit: (Event) -> Unit,
