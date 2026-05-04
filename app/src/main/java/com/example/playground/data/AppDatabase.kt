@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [User::class, Event::class, Comment::class, EventJoin::class, EventRating::class],
-    version = 7
+    version = 8
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao

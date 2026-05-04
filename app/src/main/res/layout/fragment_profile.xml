@@ -12,13 +12,26 @@
         android:layout_height="120dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="32dp"
+        android:background="#E8F0FE"
+        android:padding="8dp"
+        android:scaleType="centerCrop"
         android:src="@android:drawable/sym_def_app_icon" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp"
+        android:text="Tap image while editing to change photo"
+        android:textColor="#777777"
+        android:textSize="12sp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:hint="Name">
+
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/nameInput"
             android:layout_width="match_parent"
@@ -31,12 +44,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:hint="Email">
+
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/emailInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="textEmailAddress"
-            android:enabled="false" />
+            android:enabled="false"
+            android:inputType="textEmailAddress" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
@@ -44,6 +58,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:hint="Saved Courts">
+
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/savedCourtsInput"
             android:layout_width="match_parent"
@@ -53,20 +68,20 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/editProfileButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:text="Edit Profile"
-        style="@style/Widget.Material3.Button.OutlinedButton"
         app:icon="@android:drawable/ic_menu_edit" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/logoutButton"
+        style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="Logout"
-        style="@style/Widget.Material3.Button.TextButton"
         android:textColor="@android:color/holo_red_dark"
         app:icon="@android:drawable/ic_lock_power_off" />
 

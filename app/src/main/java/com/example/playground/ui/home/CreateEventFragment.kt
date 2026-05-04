@@ -30,6 +30,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
+import com.squareup.picasso.Picasso
 
 class CreateEventFragment : Fragment() {
 
@@ -52,7 +53,9 @@ class CreateEventFragment : Fragment() {
             uri?.let {
                 val permanentUri = copyImageToAppStorage(it) ?: it
                 selectedImageUri = permanentUri
-                selectedImageView?.setImageURI(permanentUri)
+                Picasso.get()
+                    .load(permanentUri)
+                    .into(selectedImageView)
                 selectedImageView?.visibility = View.VISIBLE
             }
         }
@@ -165,14 +168,18 @@ class CreateEventFragment : Fragment() {
 
         publishButton.setOnClickListener {
             val selectedChipId = sportGroup.checkedChipId
+
             if (selectedChipId == View.NO_ID) {
                 Toast.makeText(context, "Please select a sport", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
             if (selectedVenue == null) {
                 Toast.makeText(context, "Please select a location", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
+            publishButton.isEnabled = false
 
             val rawSport = view.findViewById<Chip>(selectedChipId).text.toString()
             val sport = cleanSportName(rawSport)
@@ -181,31 +188,57 @@ class CreateEventFragment : Fragment() {
             val maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: 10
             val venue = selectedVenue!!
 
-            viewModel.createEvent(
-                sport = sport,
-                title = title,
-                description = description,
-                startTime = System.currentTimeMillis() + 86400000,
-                maxPlayers = maxPlayers,
-                latitude = venue.latitude,
-                longitude = venue.longitude,
-                locationLabel = venue.name,
-                imageUri = selectedImageUri?.toString()
-            )
+            val createPost: (String?) -> Unit = { imageUrl ->
+                viewModel.createEvent(
+                    sport = sport,
+                    title = title,
+                    description = description,
+                    startTime = System.currentTimeMillis() + 86400000,
+                    maxPlayers = maxPlayers,
+                    latitude = venue.latitude,
+                    longitude = venue.longitude,
+                    locationLabel = venue.name,
+                    imageUri = imageUrl
+                )
 
-            Toast.makeText(context, "Event created!", Toast.LENGTH_SHORT).show()
+                publishButton.isEnabled = true
+                Toast.makeText(context, "Event created!", Toast.LENGTH_SHORT).show()
 
-            sportGroup.clearCheck()
-            titleEdit.setText("")
-            descriptionEdit.setText("")
-            maxPlayersEdit.setText("")
-            selectedVenue = null
-            selectedImageUri = null
-            selectedImageView?.visibility = View.GONE
-            selectedLocationCard.visibility = View.GONE
-            currentSportFilter = null
-            venueAdapter?.setSelected(null)
-            refreshVenueList()
+                sportGroup.clearCheck()
+                titleEdit.setText("")
+                descriptionEdit.setText("")
+                maxPlayersEdit.setText("")
+                selectedVenue = null
+                selectedImageUri = null
+                selectedImageView?.visibility = View.GONE
+                selectedLocationCard.visibility = View.GONE
+                currentSportFilter = null
+                venueAdapter?.setSelected(null)
+                refreshVenueList()
+            }
+
+            val imageUri = selectedImageUri
+
+            if (imageUri == null) {
+                createPost(null)
+            } else {
+                val ref = com.google.firebase.storage.FirebaseStorage.getInstance()
+                    .reference
+                    .child("event_images/event_${System.currentTimeMillis()}.jpg")
+
+                ref.putFile(imageUri)
+                    .continueWithTask { task ->
+                        if (!task.isSuccessful) throw task.exception ?: Exception("Upload failed")
+                        ref.downloadUrl
+                    }
+                    .addOnSuccessListener { downloadUri ->
+                        createPost(downloadUri.toString())
+                    }
+                    .addOnFailureListener {
+                        publishButton.isEnabled = true
+                        Toast.makeText(context, "Image upload failed", Toast.LENGTH_SHORT).show()
+                    }
+            }
         }
     }
 
