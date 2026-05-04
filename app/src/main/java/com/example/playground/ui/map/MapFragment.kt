@@ -35,6 +35,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
+import android.widget.ImageView
+import com.squareup.picasso.Picasso
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
@@ -329,13 +331,14 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         locationText.text = "📍 ${event.locationLabel}"
         coordinatesText.text = "%.5f, %.5f".format(event.latitude, event.longitude)
 
-        if (event.imageUri != null) {
-            try {
-                eventImageView.setImageURI(android.net.Uri.parse(event.imageUri))
-                eventImageView.visibility = View.VISIBLE
-            } catch (e: Exception) {
-                eventImageView.visibility = View.GONE
-            }
+        if (!event.imageUri.isNullOrBlank()) {
+            Picasso.get()
+                .load(event.imageUri)
+                .placeholder(android.R.drawable.ic_menu_gallery)
+                .error(android.R.drawable.ic_menu_report_image)
+                .into(eventImageView)
+
+            eventImageView.visibility = View.VISIBLE
         } else {
             eventImageView.visibility = View.GONE
         }
