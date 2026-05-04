@@ -83,6 +83,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var addCommentButton: MaterialButton
     private lateinit var imComingButton: MaterialButton
 
+    private lateinit var weatherContainer: View
+    private lateinit var weatherEmojiText: TextView
+    private lateinit var weatherDescText: TextView
+    private lateinit var weatherDetailsText: TextView
+
     private lateinit var eventImageView: android.widget.ImageView
     private lateinit var progressIndicator: LinearProgressIndicator
 
@@ -159,6 +164,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         commentInput = view.findViewById(R.id.commentInput)
         addCommentButton = view.findViewById(R.id.addCommentButton)
         imComingButton = view.findViewById(R.id.imComingButton)
+        weatherContainer = view.findViewById(R.id.weatherContainer)
+        weatherEmojiText = view.findViewById(R.id.weatherEmojiText)
+        weatherDescText = view.findViewById(R.id.weatherDescText)
+        weatherDetailsText = view.findViewById(R.id.weatherDetailsText)
         eventImageView = view.findViewById(R.id.eventImageView)
         progressIndicator = view.findViewById(R.id.progressIndicator)
     }
@@ -230,6 +239,19 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         viewModel.comments.observe(viewLifecycleOwner) { comments ->
             renderComments(comments)
+        }
+
+        viewModel.weather.observe(viewLifecycleOwner) { weather ->
+            if (weather != null) {
+                weatherEmojiText.text = weather.emoji
+                weatherDescText.text = weather.description
+                weatherDetailsText.text = "%.1f\u00B0C \u2022 Wind %.0f km/h".format(
+                    weather.temperature, weather.windSpeed
+                )
+                weatherContainer.visibility = View.VISIBLE
+            } else {
+                weatherContainer.visibility = View.GONE
+            }
         }
     }
 

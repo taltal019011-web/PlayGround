@@ -8,9 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.playground.data.Comment
 import com.example.playground.data.Event
 import com.example.playground.data.User
+import com.example.playground.network.WeatherService
 import com.example.playground.repository.AuthRepository
 import com.example.playground.repository.EventRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MapViewModel(
     private val authRepository: AuthRepository,
@@ -33,6 +36,9 @@ class MapViewModel(
 
     private val _comments = MutableLiveData<List<CommentWithAuthor>>(emptyList())
     val comments: LiveData<List<CommentWithAuthor>> = _comments
+
+    private val _weather = MutableLiveData<WeatherInfo?>(null)
+    val weather: LiveData<WeatherInfo?> = _weather
 
     var selectedSport: String = "All"
         private set
@@ -76,6 +82,7 @@ class MapViewModel(
 
     fun selectEvent(event: Event) {
         _selectedEvent.value = event
+        _weather.value = null
         refreshEventDetails(event)
         viewModelScope.launch {
             eventRepository.fetchJoinsForEvent(event.id)
@@ -85,12 +92,33 @@ class MapViewModel(
                 refreshEventDetails(event)
             }
         }
+        fetchWeather(event.latitude, event.longitude)
     }
 
     fun clearSelectedEvent() {
         _selectedEvent.value = null
         _eventDetails.value = null
         _comments.value = emptyList()
+        _weather.value = null
+    }
+
+    private fun fetchWeather(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    WeatherService.api.getWeather(latitude, longitude)
+                }
+                val cw = response.currentWeather
+                _weather.value = WeatherInfo(
+                    temperature = cw.temperature,
+                    windSpeed = cw.windSpeed,
+                    description = WeatherService.weatherDescription(cw.weatherCode),
+                    emoji = WeatherService.weatherEmoji(cw.weatherCode)
+                )
+            } catch (_: Exception) {
+                _weather.value = null
+            }
+        }
     }
 
     fun joinOrUnjoinEvent() {
@@ -181,6 +209,13 @@ class MapViewModel(
     data class CommentWithAuthor(
         val comment: Comment,
         val authorName: String
+    )
+
+    data class WeatherInfo(
+        val temperature: Double,
+        val windSpeed: Double,
+        val description: String,
+        val emoji: String
     )
 
     class Factory(
