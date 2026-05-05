@@ -166,13 +166,46 @@ class MyPostsFragment : Fragment() {
             .setView(dialogView)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Save") { _, _ ->
-                val updatedEvent = event.copy(
-                    title = titleEdit.text.toString().ifBlank { event.title },
-                    description = descriptionEdit.text.toString(),
-                    maxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers,
-                    imageUri = editImageUri?.toString() ?: event.imageUri
-                )
-                viewModel.updateEvent(updatedEvent)
+                val newTitle = titleEdit.text.toString().ifBlank { event.title }
+                val newDescription = descriptionEdit.text.toString()
+                val newMaxPlayers = maxPlayersEdit.text.toString().toIntOrNull() ?: event.maxPlayers
+                val newLocalUri = editImageUri
+
+                val isNewImage = newLocalUri != null
+                        && newLocalUri.toString() != event.imageUri
+                        && newLocalUri.scheme == "file"
+
+                if (isNewImage) {
+                    val ref = com.google.firebase.storage.FirebaseStorage.getInstance()
+                        .reference
+                        .child("event_images/event_${System.currentTimeMillis()}.jpg")
+
+                    ref.putFile(newLocalUri!!)
+                        .continueWithTask { task ->
+                            if (!task.isSuccessful) throw task.exception ?: Exception("Upload failed")
+                            ref.downloadUrl
+                        }
+                        .addOnSuccessListener { downloadUri ->
+                            val updatedEvent = event.copy(
+                                title = newTitle,
+                                description = newDescription,
+                                maxPlayers = newMaxPlayers,
+                                imageUri = downloadUri.toString()
+                            )
+                            viewModel.updateEvent(updatedEvent)
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "Image upload failed", Toast.LENGTH_SHORT).show()
+                        }
+                } else {
+                    val updatedEvent = event.copy(
+                        title = newTitle,
+                        description = newDescription,
+                        maxPlayers = newMaxPlayers,
+                        imageUri = editImageUri?.toString() ?: event.imageUri
+                    )
+                    viewModel.updateEvent(updatedEvent)
+                }
             }
             .show()
     }
